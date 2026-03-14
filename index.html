@@ -515,23 +515,53 @@ function updateLapBar(){
 /* ═══ SESSION DISCOVERY ═══════════════════ */
 let _sessFetchedAt=0;
 const SESS_TTL=5*60*1000;
+const RACE_NAME_RE=/\brace\b/i;
 
 async function findSession(){
   const now=Date.now();
-  if(S.session&&!S.sessStale&&(now-_sessFetchedAt)<SESS_TTL) return S.session;
+  if(S.session&&!S.sessStale&&(now-_sessFetchedAt)<(S.isLive?SESS_TTL:30000)) return S.session;
   S.sessStale=false; _sessFetchedAt=now;
+
+  let sess=null;
   try{
     const latest=await apiFetch('/sessions?session_key=latest');
-    if(Array.isArray(latest)&&latest.length){
-      const sess=latest[0]; S.dataYear=sess.year||CURRENT_YEAR;
-      if(sess.meeting_key){
-        const yr=sess.year||S.dataYear||CURRENT_YEAR;
-        const all=await apiFetch(`/sessions?year=${yr}`).catch(()=>[]);
-        S.meetingSessions=all.filter(s=>s.meeting_key===sess.meeting_key).sort((a,b)=>new Date(a.date_start)-new Date(b.date_start));
-      }
-      return sess;
-    }
+    if(Array.isArray(latest)&&latest.length) sess=latest[0];
   }catch(_){}
+
+  // If nothing live, prefer the most recent completed Race session
+  const sessIsLive=sess&&isLiveSess(sess);
+  if(!sessIsLive){
+    const yr=(sess?.year)||S.dataYear||CURRENT_YEAR;
+    if(!S.dataYear&&sess?.year) S.dataYear=sess.year;
+    const all=await apiFetch(`/sessions?year=${yr}`).catch(()=>[]);
+    const nowMs=Date.now();
+    const pastRaces=all.filter(s=>RACE_NAME_RE.test(s.session_name||'')&&s.date_start&&new Date(s.date_start).getTime()<nowMs);
+    if(pastRaces.length){
+      pastRaces.sort((a,b)=>new Date(b.date_start)-new Date(a.date_start));
+      sess=pastRaces[0];
+      S.dataYear=sess.year||yr;
+    } else if(!sess&&all.length){
+      all.sort((a,b)=>new Date(b.date_start)-new Date(a.date_start));
+      sess=all[0];
+    }
+    if(sess?.meeting_key){
+      S.meetingSessions=all.filter(s=>s.meeting_key===sess.meeting_key).sort((a,b)=>new Date(a.date_start)-new Date(b.date_start));
+    }
+    return sess;
+  }
+
+  // Live session — use it directly, load meeting siblings
+  if(sess){
+    S.dataYear=sess.year||CURRENT_YEAR;
+    if(sess.meeting_key){
+      const yr=sess.year||S.dataYear||CURRENT_YEAR;
+      const all=await apiFetch(`/sessions?year=${yr}`).catch(()=>[]);
+      S.meetingSessions=all.filter(s=>s.meeting_key===sess.meeting_key).sort((a,b)=>new Date(a.date_start)-new Date(b.date_start));
+    }
+    return sess;
+  }
+
+  // Fallback: year scan
   for(let yr=CURRENT_YEAR;yr>=CURRENT_YEAR-2;yr--){
     const all=await apiFetch(`/sessions?year=${yr}`).catch(()=>[]);
     if(!all.length) continue;
@@ -539,15 +569,13 @@ async function findSession(){
     const nowMs=Date.now();
     const started=all.filter(s=>s.date_start&&new Date(s.date_start).getTime()<=nowMs);
     if(started.length){
-      const mk=started.reduce((m,s)=>s.meeting_key>m?s.meeting_key:m,started[0].meeting_key);
-      const latest=started.filter(s=>s.meeting_key===mk).sort((a,b)=>new Date(b.date_start)-new Date(a.date_start));
-      S.meetingSessions=all.filter(s=>s.meeting_key===mk).sort((a,b)=>new Date(a.date_start)-new Date(b.date_start));
-      return latest[0];
+      const pastRaces=started.filter(s=>RACE_NAME_RE.test(s.session_name||''));
+      const pool=pastRaces.length?pastRaces:started;
+      pool.sort((a,b)=>new Date(b.date_start)-new Date(a.date_start));
+      const best=pool[0];
+      S.meetingSessions=all.filter(s=>s.meeting_key===best.meeting_key).sort((a,b)=>new Date(a.date_start)-new Date(b.date_start));
+      return best;
     }
-    all.sort((a,b)=>new Date(a.date_start)-new Date(b.date_start));
-    const mk=all[0].meeting_key;
-    S.meetingSessions=all.filter(s=>s.meeting_key===mk).sort((a,b)=>new Date(a.date_start)-new Date(b.date_start));
-    return all[0];
   }
   return null;
 }
