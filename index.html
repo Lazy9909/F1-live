@@ -144,9 +144,6 @@
     .trow-gap{font-family:'Barlow Condensed',sans-serif;font-size:12px;color:var(--muted);text-align:right;}
     .trow-gap.ldr{color:var(--green);font-size:10px;}
 
-    /* Weather */
-    .wx-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:10px 12px;}
-
     /* Schedule */
     .slist{padding:10px 12px;display:flex;flex-direction:column;gap:7px;}
     .scard{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 13px;display:flex;justify-content:space-between;align-items:center;}
@@ -157,34 +154,30 @@
     .srnd{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:26px;color:var(--border);}
     .scard.now .srnd{color:var(--red);}
 
-    /* Position Changes */
-    .pc-wrap{padding:0 12px 10px;}
-    .pc-block{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
-    .pc-hdr{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;}
-    .pc-ts{font-size:10px;color:var(--muted);margin-left:auto;font-family:'Barlow',sans-serif;font-weight:400;letter-spacing:0;}
-    .pc-list{display:flex;flex-direction:column;}
-    .pc-row{display:grid;grid-template-columns:1fr auto;align-items:center;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.04);gap:8px;}
-    .pc-row:last-child{border-bottom:none;}
+    /* Live Feed */
+    .lf-wrap{padding:8px 12px 16px;display:flex;flex-direction:column;gap:6px;}
+    /* Accordion section */
+    details.lf-section{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+    details.lf-section>summary{list-style:none;display:flex;align-items:center;gap:8px;
+      padding:11px 13px;cursor:pointer;user-select:none;font-family:'Barlow Condensed',sans-serif;
+      font-weight:700;font-size:12px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);}
+    details.lf-section>summary::-webkit-details-marker{display:none;}
+    details.lf-section>summary .lf-ico{font-size:15px;}
+    details.lf-section>summary .lf-chevron{margin-left:auto;color:var(--muted);font-size:11px;transition:transform .2s;}
+    details.lf-section[open]>summary .lf-chevron{transform:rotate(180deg);}
+    details.lf-section[open]>summary{color:var(--text);}
+    .lf-body{padding:8px 12px 12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:5px;}
+    /* Position changes inside live feed */
+    .pc-row{display:grid;grid-template-columns:1fr auto;align-items:center;
+      padding:8px 10px;background:var(--surface2);border-radius:6px;gap:8px;}
     .pc-left{display:flex;align-items:center;gap:8px;}
-    .pc-badge{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:18px;min-width:26px;text-align:center;}
+    .pc-badge{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:18px;min-width:24px;text-align:center;}
     .pc-badge.up{color:var(--green);}.pc-badge.dn{color:var(--red);}
     .pc-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;text-transform:uppercase;}
     .pc-team{font-size:10px;color:var(--muted);}
-    .pc-arrow{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;display:flex;align-items:center;gap:5px;white-space:nowrap;}
+    .pc-arrow{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;
+      display:flex;align-items:center;gap:4px;white-space:nowrap;}
     .pc-arrow.up{color:var(--green);}.pc-arrow.dn{color:var(--red);}
-    .pc-none{font-size:12px;color:var(--muted);padding:10px 12px;font-style:italic;}
-
-    /* Radio transcript */
-    .radio-transcript{font-size:13px;line-height:1.5;color:var(--text);margin-top:6px;padding:6px 9px;background:var(--surface2);border-radius:5px;border-left:2px solid var(--gold);}
-    .radio-transcript.pending{color:var(--muted);font-style:italic;}
-    .radio-transcript.err{color:var(--muted);font-style:italic;border-left-color:var(--border);}
-    .retry-btn{margin-top:5px;background:none;border:1px solid var(--border);border-radius:4px;color:var(--muted);font-size:10px;padding:2px 8px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;display:inline-block;}
-    .retry-btn:hover{border-color:var(--gold);color:var(--gold);}
-
-    /* Live Feed */
-    .lf-wrap{padding:8px 12px 16px;display:flex;flex-direction:column;gap:8px;}
-    .lf-hdr{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);padding:10px 0 5px;border-bottom:1px solid var(--border);margin-bottom:7px;display:flex;align-items:center;gap:6px;}
-    .lf-hdr span{font-size:16px;}
     .lf-count{margin-left:auto;background:var(--surface2);border-radius:10px;padding:1px 7px;font-size:10px;color:var(--muted);}
     .lf-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;border-left:3px solid var(--border);}
     .lf-item.radio{border-left-color:var(--gold);}
@@ -250,7 +243,7 @@
   </div>
 </header>
 
-<div id="stale-bar" onclick="manualRefresh()">⚠ Data may be stale — tap to refresh</div>
+<div id="stale-bar">⚠ Data may be stale — tap to refresh</div>
 
 <div id="raceinfo">
   <div class="ri">
@@ -391,9 +384,7 @@ const S={
   isLive:false, lastUpdated:null, dataYear:null,
   tickN:0, meetingSessions:[],
   radioMsgs:[], ctrlMsgs:[], lapComments:[],
-  _liveSk:null,
   prevPositions:{}, posChanges:[],
-  radioTranscripts:{},
 };
 let _tickTimer=null,_curTick=0,_schedDone=false,_liveDone=false;
 let _lastRadioTs=null,_lastCtrlTs=null,_staleTimer=null;
@@ -402,9 +393,10 @@ function purgeSession(){
   S.positions=[];S.intervals={};S.stints={};S.laps={};S.fastestLap=null;
   S.weather=null;S.lapCount=0;S.drvStd=[];S.teamStd=[];
   S.retiredDrivers=new Set();
-  S.radioMsgs=[];S.ctrlMsgs=[];S.lapComments=[];S._liveSk=null;
+  S.radioMsgs=[];S.ctrlMsgs=[];S.lapComments=[];
   _liveDone=false;_lastRadioTs=null;_lastCtrlTs=null;
-  S.prevPositions={};S.posChanges=[];S.radioTranscripts={};
+  _schedDone=false; // reset so calendar reloads if season changes
+  S.prevPositions={};S.posChanges=[];
 }
 
 /* ═══ DOM HELPERS ═════════════════════════ */
@@ -423,10 +415,24 @@ function fmtLap(sec){
 }
 function isLiveSess(sess){
   if(!sess) return false;
-  const now=Date.now(),start=sess.date_start?new Date(sess.date_start).getTime():0,end=sess.date_end?new Date(sess.date_end).getTime():0;
-  if(start>now) return false;
-  if(!end) return true;
-  return (now-end)<4*3600000;
+  const now=Date.now();
+  const start=sess.date_start?new Date(sess.date_start).getTime():0;
+  const end=sess.date_end?new Date(sess.date_end).getTime():0;
+  if(!start||start>now) return false;   // not started yet
+  if(end) return now<end;               // have end time — live only if strictly before it
+  // No end time set yet (session in progress or OpenF1 hasn't closed it):
+  // treat as live only within 3h of start — covers longest possible F1 session
+  return (now-start)<3*3600000;
+}
+/* isRecent: session started and ended within 2h (show data even after finish) */
+function isRecent(sess){
+  if(!sess) return false;
+  const now=Date.now();
+  const start=sess.date_start?new Date(sess.date_start).getTime():0;
+  const end=sess.date_end?new Date(sess.date_end).getTime():0;
+  if(!start||start>now) return false;   // not started yet — nothing to show
+  if(end) return (now-end)<2*3600000;   // ended — recent if within 2h
+  return (now-start)<3*3600000;         // no end — use same 3h cap as isLiveSess
 }
 function tyreHTML(c){
   if(!c) return '';
@@ -533,7 +539,7 @@ async function findSession(){
 
 /* ═══ DNF DETECTION ═══════════════════════ */
 function detectRetirements(){
-  if(!S.isLive) return;
+  // Run for both live and recently-finished sessions so DNF badges persist
   S.positions.forEach(p=>{
     if(p.position===1) return;
     const iv=S.intervals[p.driver_number];
@@ -585,6 +591,7 @@ async function bootLoad(){
     }
     computeStandings(); renderRaceBoard(); renderStandings(); renderSessionInfo(sess); updateLapBar();
     showBootProgress('Loading intervals…',42);
+    const bootRecent=isRecent(sess);
 
     if(live){
       const intArr=await apiFetch(`/intervals?session_key=${S.sk}`).catch(()=>[]);
@@ -592,13 +599,13 @@ async function bootLoad(){
     }
     showBootProgress('Loading stints…',56);
 
-    if(live){
+    if(bootRecent){
       const stArr=await apiFetch(`/stints?session_key=${S.sk}`).catch(()=>[]);
       if(stArr.length){ const ls={}; stArr.forEach(s=>{ if(!ls[s.driver_number]||s.stint_number>(ls[s.driver_number].stint_number||0)) ls[s.driver_number]=s; }); S.stints=ls; }
     }
     showBootProgress('Loading laps…',70);
 
-    if(live){
+    if(bootRecent){
       const lapArr=await apiFetch(`/laps?session_key=${S.sk}`).catch(()=>[]);
       if(lapArr.length){
         const ll={}; lapArr.forEach(l=>{ if(!ll[l.driver_number]||l.lap_number>(ll[l.driver_number].lap_number||0)) ll[l.driver_number]=l; }); S.laps=ll;
@@ -612,13 +619,13 @@ async function bootLoad(){
     updateLapBar();
     showBootProgress('Loading weather…',84);
 
-    if(live){ const wxArr=await apiFetch(`/weather?session_key=${S.sk}`).catch(()=>[]); S.weather=wxArr.length?wxArr[wxArr.length-1]:null; }
+    if(bootRecent){ const wxArr=await apiFetch(`/weather?session_key=${S.sk}`).catch(()=>[]); S.weather=wxArr.length?wxArr[wxArr.length-1]:null; }
     showBootProgress('Loading calendar…',92);
     if(!_schedDone){ _schedDone=true; loadSchedule(); }
 
     detectRetirements(); computeStandings();
     renderRaceBoard(); renderStandings(); renderSessionInfo(sess);
-    renderTimings(); renderWeather(); renderPositionChanges();
+    renderTimings(); renderWeather();
     S.lastUpdated=new Date(); resetStaleTimer();
     showBootProgress('Ready',100);
     await new Promise(r=>setTimeout(r,300));
@@ -653,7 +660,9 @@ async function loadAll(){
   try{
     const sess=await findSession(); if(!sess) return showNoData();
     S.session=sess; S.sk=sess.session_key;
-    const live=isLiveSess(sess); setStatus(live); updateHeader(sess);
+    const live=isLiveSess(sess);
+    const recent=isRecent(sess);   // live OR ended within last 2h
+    setStatus(live); updateHeader(sess);
 
     if(S.skLoaded!==S.sk){
       purgeSession(); S.skLoaded=S.sk;
@@ -686,8 +695,8 @@ async function loadAll(){
       const li={}; intArr.forEach(i=>{ if(!li[i.driver_number]||i.date>li[i.driver_number].date) li[i.driver_number]=i; }); S.intervals=li;
     } else S.intervals={};
 
-    // Laps — live only
-    if(live){
+    // Laps — live + recently-finished
+    if(recent){
       const lapArr=await apiFetch(`/laps?session_key=${S.sk}`).catch(()=>[]);
       if(lapArr.length){
         const ll={}; lapArr.forEach(l=>{ if(!ll[l.driver_number]||l.lap_number>(ll[l.driver_number].lap_number||0)) ll[l.driver_number]=l; }); S.laps=ll;
@@ -700,23 +709,23 @@ async function loadAll(){
     }
     updateLapBar();
 
-    // Stints — live + slow tick only
-    if(live&&(slowTick||!Object.keys(S.stints).length)){
+    // Stints — live/recent + slow tick
+    if(recent&&(slowTick||!Object.keys(S.stints).length)){
       const stArr=await apiFetch(`/stints?session_key=${S.sk}`).catch(()=>[]);
       if(stArr.length){ const ls={}; stArr.forEach(s=>{ if(!ls[s.driver_number]||s.stint_number>(ls[s.driver_number].stint_number||0)) ls[s.driver_number]=s; }); S.stints=ls; }
     }
 
-    // Weather — live + slow tick only
-    if(live&&(slowTick||!S.weather)){
+    // Weather — live/recent + slow tick
+    if(recent&&(slowTick||!S.weather)){
       const wxArr=await apiFetch(`/weather?session_key=${S.sk}`).catch(()=>[]); S.weather=wxArr.length?wxArr[wxArr.length-1]:null;
     }
 
-    // Live feed — live + slow tick only
-    if(live&&(slowTick||!_liveDone)){ _liveDone=true; fetchLiveFeed(); }
+    // Live feed — live + recently-finished
+    if(recent&&(slowTick||!_liveDone)){ _liveDone=true; fetchLiveFeed().catch(e=>console.warn('[liveFeed]',e)); }
 
     detectRetirements(); computeStandings();
     renderRaceBoard(); renderStandings(); renderSessionInfo(sess);
-    renderTimings(); renderWeather(); renderPositionChanges();
+    renderTimings(); renderWeather();
     S.lastUpdated=new Date(); resetStaleTimer();
 
     if(!_schedDone){ _schedDone=true; loadSchedule(); }
@@ -826,20 +835,29 @@ function renderStandings(){
   $('lb-team-wrap').innerHTML=th;
 }
 
-function renderPositionChanges(){
-  const wrap=$('sx-poschanges-wrap'); if(!wrap) return;
-  if(!S.isLive||!S.posChanges.length){
-    wrap.innerHTML=S.isLive?`<div class="pc-wrap"><div class="pc-block"><div class="pc-hdr">🔄 Position Changes</div><div class="pc-none">No changes detected yet this session</div></div></div>`:'';
-    return;
+/* Returns HTML string for position changes — rendered inside live feed */
+function posChangesHTML(){
+  const count=S.posChanges.length;
+  const open=S.isLive&&count>0?' open':'';
+  let body='';
+  if(!S.isLive){
+    body='<div class="lf-body"><div class="lf-empty">Position tracking is live-only</div></div>';
+  } else if(!count){
+    body='<div class="lf-body"><div class="lf-empty">No overtakes detected yet this session</div></div>';
+  } else {
+    let rows='';
+    S.posChanges.forEach(c=>{
+      const dr=S.drivers[c.driver_number]||{},col=dr.team_colour?'#'+dr.team_colour:'#555';
+      const gained=c.to<c.from,delta=Math.abs(c.from-c.to),dir=gained?'up':'dn';
+      rows+=`<div class="pc-row"><div class="pc-left"><div class="pc-badge ${dir}">${gained?'▲':'▼'}${delta}</div><div><div class="pc-name" style="color:${col}">${dr.name_acronym||dr.full_name||'#'+c.driver_number}</div><div class="pc-team">${dr.team_name||'—'}</div></div></div><div class="pc-arrow ${dir}">P${c.from} → P${c.to} <span style="font-size:10px;color:var(--muted);margin-left:3px">${c.ts}</span></div></div>`;
+    });
+    body=`<div class="lf-body">${rows}</div>`;
   }
-  let rows='';
-  S.posChanges.forEach(c=>{
-    const dr=S.drivers[c.driver_number]||{},col=dr.team_colour?'#'+dr.team_colour:'#555';
-    const gained=c.to<c.from,delta=Math.abs(c.from-c.to),dir=gained?'up':'dn';
-    rows+=`<div class="pc-row"><div class="pc-left"><div class="pc-badge ${dir}">${gained?'▲':'▼'}${delta}</div><div><div class="pc-name" style="color:${col}">${dr.name_acronym||dr.full_name||'#'+c.driver_number}</div><div class="pc-team">${dr.team_name||'—'}</div></div></div><div class="pc-arrow ${dir}">P${c.from} → P${c.to}<span style="font-size:10px;color:var(--muted);font-family:'Barlow',sans-serif;font-weight:400;margin-left:4px">${c.ts}</span></div></div>`;
-  });
-  wrap.innerHTML=`<div class="pc-wrap"><div class="pc-block"><div class="pc-hdr">🔄 Position Changes <span class="lf-count">${S.posChanges.length}</span><span class="pc-ts">Latest: ${S.posChanges[0].ts}</span></div><div class="pc-list">${rows}</div></div></div>`;
+  const badge=count?`<span class="lf-count">${count}</span>`:'';
+  return `<details class="lf-section"${open}><summary><span class="lf-ico">🔄</span> Position Changes ${badge}<span class="lf-chevron">▾</span></summary>${body}</details>`;
 }
+/* Legacy no-op — position changes now rendered inside renderLiveFeed */
+function renderPositionChanges(){}
 
 function renderSessionInfo(s){
   const live=isLiveSess(s);
@@ -854,8 +872,8 @@ function renderSessionInfo(s){
     const countdown=h>0?`${h}h ${m}m`:`${m}m`;
     nextHTML=`<div style="padding:0 12px 10px"><div class="icard" style="border-color:var(--red);background:rgba(225,6,0,.04)"><div class="ilbl" style="color:var(--red)">▶ Next Session</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px">${nextSess.session_name}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${ns.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})} · ${ns.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})} local</div></div><div style="text-align:right"><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;color:var(--red)">${countdown}</div><div style="font-size:10px;color:var(--muted)">away</div></div></div></div></div>`;
   }
-  $('sx-info-wrap').innerHTML=`${nextHTML}<div id="sx-poschanges-wrap"></div><div class="igrid"><div class="icard"><div class="ilbl">Session</div><div class="ival" style="font-size:16px">${s.session_name||'—'}</div></div><div class="icard"><div class="ilbl">Status</div><div class="ival ${live?'green':''}">${live?'LIVE':'FINISHED'}</div></div><div class="icard"><div class="ilbl">Circuit</div><div class="ival" style="font-size:15px">${s.circuit_short_name||'—'}</div></div><div class="icard"><div class="ilbl">Country</div><div class="ival" style="font-size:15px">${s.country_name||'—'}</div></div><div class="icard"><div class="ilbl">Lap</div><div class="ival red">${S.lapCount||'—'}<span style="font-size:13px;color:var(--muted)"> / ${S.totalLaps}</span></div></div><div class="icard"><div class="ilbl">Fastest Lap</div><div class="ival purple" style="font-size:14px">${fmtLap(S.fastestLap?.lap_duration)}</div></div></div><div style="padding:0 12px 10px"><div class="icard"><div class="ilbl">Date</div><div style="font-size:13px;margin-top:4px">${ds}</div></div></div><div style="padding:0 12px 10px"><div class="icard"><div class="ilbl">Last Updated</div><div style="font-size:12px;margin-top:4px;color:var(--muted)">${S.lastUpdated?S.lastUpdated.toLocaleTimeString():'—'}</div></div></div>`;
-  renderWeekend(); renderPositionChanges();
+  $('sx-info-wrap').innerHTML=`${nextHTML}<div class="igrid"><div class="icard"><div class="ilbl">Session</div><div class="ival" style="font-size:16px">${s.session_name||'—'}</div></div><div class="icard"><div class="ilbl">Status</div><div class="ival ${live?'green':''}">${live?'LIVE':'FINISHED'}</div></div><div class="icard"><div class="ilbl">Circuit</div><div class="ival" style="font-size:15px">${s.circuit_short_name||'—'}</div></div><div class="icard"><div class="ilbl">Country</div><div class="ival" style="font-size:15px">${s.country_name||'—'}</div></div><div class="icard"><div class="ilbl">Lap</div><div class="ival red">${S.lapCount||'—'}<span style="font-size:13px;color:var(--muted)"> / ${S.totalLaps}</span></div></div><div class="icard"><div class="ilbl">Fastest Lap</div><div class="ival purple" style="font-size:14px">${fmtLap(S.fastestLap?.lap_duration)}</div></div></div><div style="padding:0 12px 10px"><div class="icard"><div class="ilbl">Date</div><div style="font-size:13px;margin-top:4px">${ds}</div></div></div><div style="padding:0 12px 10px"><div class="icard"><div class="ilbl">Last Updated</div><div style="font-size:12px;margin-top:4px;color:var(--muted)">${S.lastUpdated?S.lastUpdated.toLocaleTimeString():'—'}</div></div></div>`;
+  renderWeekend();
 }
 
 function renderWeekend(){
@@ -931,14 +949,14 @@ function flagHtml(flag,cat){
 }
 
 async function fetchLiveFeed(){
-  if(!S.sk||!S.isLive){ renderLiveFeed(); return; }
+  if(!S.sk){ renderLiveFeed(); return; }
   const radioUrl=`/team_radio?session_key=${S.sk}`+(_lastRadioTs?`&date>${_lastRadioTs}`:'');
   const radio=await apiFetch(radioUrl).catch(()=>null);
   if(radio&&radio.length){
     radio.sort((a,b)=>new Date(b.date)-new Date(a.date));
     _lastRadioTs=radio[0].date;
     S.radioMsgs=[...radio,...S.radioMsgs].slice(0,CAP_RADIO);
-    radio.forEach(m=>{ if(m.recording_url&&!S.radioTranscripts[m.recording_url]) transcribeRadio(m.recording_url); });
+
   }
   const ctrlUrl=`/race_control?session_key=${S.sk}`+(_lastCtrlTs?`&date>${_lastCtrlTs}`:'');
   const ctrl=await apiFetch(ctrlUrl).catch(()=>null);
@@ -956,86 +974,78 @@ async function fetchLiveFeed(){
   renderLiveFeed();
 }
 
-async function transcribeRadio(url,isRetry){
-  if(!isRetry&&S.radioTranscripts[url]) return;
-  S.radioTranscripts[url]={status:'pending',text:''}; renderLiveFeed();
-  try{
-    const audioRes=await fetch(url); if(!audioRes.ok) throw new Error('Audio fetch failed');
-    const blob=await audioRes.blob();
-    const b64=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(blob); });
-    const apiRes=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:120,messages:[{role:'user',content:[
-        {type:'document',source:{type:'base64',media_type:'audio/mpeg',data:b64}},
-        {type:'text',text:'Transcribe this F1 team radio clip verbatim. Return ONLY the spoken words — no labels, no quotes, no explanation. If inaudible or silent write: [inaudible]'}
-      ]}]})
-    });
-    if(!apiRes.ok){ const e=await apiRes.json().catch(()=>({})); throw new Error(e?.error?.message||`HTTP ${apiRes.status}`); }
-    const data=await apiRes.json();
-    const text=data?.content?.find(b=>b.type==='text')?.text?.trim()||'[inaudible]';
-    S.radioTranscripts[url]={status:'done',text};
-  }catch(err){ S.radioTranscripts[url]={status:'err',text:'',url}; }
-  renderLiveFeed();
-}
-
 function renderLiveFeed(){
   const wrap=$('lv-wrap'); if(!wrap) return;
-  if(!S.isLive){
-    const sess=S.session,nextStart=sess?.date_start?new Date(sess.date_start):null,nowMs=Date.now();
+  const hasAnyData=S.radioMsgs.length>0||S.ctrlMsgs.length>0||S.lapComments.length>0||S.posChanges.length>0;
+  if(!S.isLive&&!hasAnyData){
+    const nowMs=Date.now();
+    const upcoming=S.meetingSessions.filter(ms=>new Date(ms.date_start).getTime()>nowMs);
+    const nextSess=upcoming[0]||null;
     let countdown='';
-    if(nextStart&&nextStart.getTime()>nowMs){ const d=nextStart.getTime()-nowMs,h=Math.floor(d/3600000),m=Math.floor((d%3600000)/60000); countdown=h>0?`Starts in ${h}h ${m}m`:`Starts in ${m}m`; }
-    wrap.innerHTML=`<div class="lf-notlive"><div class="ico">📡</div><h3>Race Not Live</h3><p>Live Feed only shows data during an active session.<br>${countdown?`<span style="color:var(--green);font-weight:700">${countdown}</span>`:'Check back on race day.'}</p></div>`;
+    if(nextSess){ const d=new Date(nextSess.date_start).getTime()-nowMs,h=Math.floor(d/3600000),m=Math.floor((d%3600000)/60000); countdown=h>0?`${nextSess.session_name} in ${h}h ${m}m`:`${nextSess.session_name} in ${m}m`; }
+    wrap.innerHTML=`<div class="lf-notlive"><div class="ico">📡</div><h3>No Live Feed Data</h3><p>Team radio, race control and lap notes appear during an active session.<br>${countdown?`<span style="color:var(--green);font-weight:700">Next: ${countdown}</span>`:'Check back on race day.'}</p></div>`;
     return;
   }
-  const hasRadio=S.radioMsgs.length>0,hasCtrl=S.ctrlMsgs.length>0,hasLaps=S.lapComments.length>0;
-  if(!hasRadio&&!hasCtrl&&!hasLaps){ wrap.innerHTML=`<div class="smsg"><div class="ico">📡</div><h3>Waiting for data…</h3><p>Team radio, race control and lap notes appear here during a live session.</p></div>`; return; }
 
+  /* Build all 4 accordion sections */
   let html='<div class="lf-wrap">';
 
-  // Race Control — with SC/VSC/Red Flag alert banners
-  html+=`<div class="lf-section"><div class="lf-hdr"><span>🚦</span> Race Control <span class="lf-count">${S.ctrlMsgs.length}</span></div>`;
-  if(hasCtrl){
+  /* ── 1. Position Changes (top, auto-open when live) ── */
+  html+=posChangesHTML();
+
+  /* ── 2. Race Control (auto-open when has data) ── */
+  const ctrlOpen=S.ctrlMsgs.length>0?' open':'';
+  let ctrlBody='<div class="lf-body">';
+  if(S.ctrlMsgs.length){
     S.ctrlMsgs.forEach(m=>{
-      const type=classifyCtrl(m),fg=flagHtml(m.flag,m.category),cat=m.category?`<span style="color:var(--muted)">${m.category}</span>`:'';
+      const type=classifyCtrl(m),fg=flagHtml(m.flag,m.category);
+      const cat=m.category?`<span style="color:var(--muted)">${m.category}</span>`:'';
       const alertMap={sc:'🚗 SAFETY CAR',vsc:'🐢 VIRTUAL SC',redflag:'🔴 RED FLAG'};
       const alertHtml=alertMap[type]?`<div class="lf-alert ${type}">${alertMap[type]}</div>`:'';
-      html+=`<div class="lf-item ctrl${type?' '+type:''}">
+      ctrlBody+=`<div class="lf-item ctrl${type?' '+type:''}">
         ${alertHtml}
         <div class="lf-meta"><span class="lf-time">${fmtTs(m.date)}</span>${m.lap_number?`<span>Lap ${m.lap_number}</span>`:''} ${fg}${cat}</div>
         <div class="lf-msg">${m.message||'—'}</div>
       </div>`;
     });
-  } else html+='<div class="lf-empty">No race control messages yet</div>';
-  html+='</div>';
+  } else ctrlBody+='<div class="lf-empty">No race control messages yet</div>';
+  ctrlBody+='</div>';
+  const ctrlBadge=S.ctrlMsgs.length?`<span class="lf-count">${S.ctrlMsgs.length}</span>`:'';
+  html+=`<details class="lf-section"${ctrlOpen}><summary><span class="lf-ico">🚦</span> Race Control ${ctrlBadge}<span class="lf-chevron">▾</span></summary>${ctrlBody}</details>`;
 
-  // Team Radio — transcripts with retry button
-  html+=`<div class="lf-section"><div class="lf-hdr"><span>📻</span> Team Radio <span class="lf-count">${S.radioMsgs.length}</span></div>`;
-  if(hasRadio){
+  /* ── 3. Team Radio ── */
+  const radioOpen=S.radioMsgs.length>0?' open':'';
+  let radioBody='<div class="lf-body">';
+  if(S.radioMsgs.length){
     S.radioMsgs.forEach(m=>{
-      const dr=S.drivers[m.driver_number]||{},col=dr.team_colour?'#'+dr.team_colour:'#888',name=dr.name_acronym||dr.full_name||'#'+m.driver_number;
-      const tr=m.recording_url?S.radioTranscripts[m.recording_url]:null;
-      let txHtml;
-      if(!m.recording_url) txHtml='<div class="radio-transcript err">No recording available</div>';
-      else if(!tr) txHtml='<div class="radio-transcript pending">⏳ Queued for transcription…</div>';
-      else if(tr.status==='pending') txHtml='<div class="radio-transcript pending">🎙️ Transcribing…</div>';
-      else if(tr.status==='err') txHtml=`<div class="radio-transcript err">Could not transcribe<br><button class="retry-btn" onclick="transcribeRadio('${m.recording_url.replace(/'/g,"\\'")}',true)">↻ Retry</button></div>`;
-      else txHtml=`<div class="radio-transcript">${tr.text}</div>`;
-      html+=`<div class="lf-item radio"><div class="lf-meta"><span class="lf-driver" style="color:${col}">${name}</span><span style="color:var(--muted);font-size:10px">${dr.team_name||''}</span><span class="lf-time" style="margin-left:auto">${fmtTs(m.date)}</span></div>${txHtml}</div>`;
+      const dr=S.drivers[m.driver_number]||{},col=dr.team_colour?'#'+dr.team_colour:'#888';
+      const name=dr.name_acronym||dr.full_name||'#'+m.driver_number;
+      const audioHtml=m.recording_url
+        ?`<div class="lf-audio"><audio controls preload="none" style="flex:1;height:28px;min-width:0;accent-color:var(--gold)"><source src="${m.recording_url}" type="audio/mpeg"></audio></div>`
+        :'<div style="font-size:11px;color:var(--muted);font-style:italic;margin-top:4px">No audio available</div>';
+      radioBody+=`<div class="lf-item radio"><div class="lf-meta"><span class="lf-driver" style="color:${col}">${name}</span><span style="color:var(--muted);font-size:10px">${dr.team_name||''}</span><span class="lf-time" style="margin-left:auto">${fmtTs(m.date)}</span></div>${audioHtml}</div>`;
     });
-  } else html+='<div class="lf-empty">No team radio yet</div>';
-  html+='</div>';
+  } else radioBody+='<div class="lf-empty">No team radio yet</div>';
+  radioBody+='</div>';
+  const radioBadge=S.radioMsgs.length?`<span class="lf-count">${S.radioMsgs.length}</span>`:'';
+  html+=`<details class="lf-section"${radioOpen}><summary><span class="lf-ico">📻</span> Team Radio ${radioBadge}<span class="lf-chevron">▾</span></summary>${radioBody}</details>`;
 
-  // Lap Notes
-  html+=`<div class="lf-section"><div class="lf-hdr"><span>📋</span> Lap Notes <span class="lf-count">${S.lapComments.length}</span></div>`;
-  if(hasLaps){
+  /* ── 4. Lap Notes ── */
+  const lapOpen=S.lapComments.length>0?' open':'';
+  let lapBody='<div class="lf-body">';
+  if(S.lapComments.length){
     S.lapComments.forEach(l=>{
-      const dr=S.drivers[l.driver_number]||{},col=dr.team_colour?'#'+dr.team_colour:'#888',name=dr.name_acronym||dr.full_name||'#'+l.driver_number;
+      const dr=S.drivers[l.driver_number]||{},col=dr.team_colour?'#'+dr.team_colour:'#888';
+      const name=dr.name_acronym||dr.full_name||'#'+l.driver_number;
       const note=l.is_pit_out_lap?'🔧 Out lap after pit stop':`⏱ Lap ${l.lap_number} · ${fmtLap(l.lap_duration)}`;
-      html+=`<div class="lf-item lap"><div class="lf-meta"><span class="lf-driver" style="color:${col}">${name}</span><span class="lf-time" style="margin-left:auto">Lap ${l.lap_number||'—'}</span></div><div class="lf-msg">${note}</div></div>`;
+      lapBody+=`<div class="lf-item lap"><div class="lf-meta"><span class="lf-driver" style="color:${col}">${name}</span><span class="lf-time" style="margin-left:auto">Lap ${l.lap_number||'—'}</span></div><div class="lf-msg">${note}</div></div>`;
     });
-  } else html+='<div class="lf-empty">No lap notes yet</div>';
-  html+='</div></div>';
+  } else lapBody+='<div class="lf-empty">No pit stops recorded yet</div>';
+  lapBody+='</div>';
+  const lapBadge=S.lapComments.length?`<span class="lf-count">${S.lapComments.length}</span>`:'';
+  html+=`<details class="lf-section"${lapOpen}><summary><span class="lf-ico">📋</span> Lap Notes ${lapBadge}<span class="lf-chevron">▾</span></summary>${lapBody}</details>`;
+
+  html+='</div>';
   wrap.innerHTML=html;
 }
 
@@ -1085,6 +1095,7 @@ function startTimers(){ setTick(TICK_LIVE); }
 
 /* ═══ BOOT ════════════════════════════════ */
 initTabs();
+$('stale-bar').addEventListener('click', manualRefresh);
 $('fab').addEventListener('click',()=>{ $('fab').classList.add('spin'); loadAll().finally(()=>$('fab').classList.remove('spin')); });
 bootLoad().then(startTimers);
 
