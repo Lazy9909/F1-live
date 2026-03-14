@@ -120,20 +120,40 @@
     .ival{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;margin-top:2px;}
     .ival.green{color:var(--green);}.ival.red{color:var(--red);}.ival.purple{color:var(--purple);}
 
-    /* Timings — shown in Live Feed tab */
-    .timing-wrap{padding:6px 12px 12px;}
-    .timing-hdr{display:grid;grid-template-columns:26px 4px 1fr 80px 72px 36px 26px;gap:6px;align-items:center;padding:5px 8px;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);margin-bottom:4px;}
-    .timing-hdr div:nth-child(4),.timing-hdr div:nth-child(5){text-align:right;}
-    .trow{display:grid;grid-template-columns:26px 4px 1fr 80px 72px 36px 26px;gap:6px;align-items:center;padding:7px 8px;background:var(--surface);border-radius:6px;margin-bottom:3px;}
-    .trow.dnf{opacity:.4;}
-    .trow-pos{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:16px;color:var(--muted);text-align:center;}
-    .trow-pos.p1{color:var(--gold);}.trow-pos.p2{color:var(--silver);}.trow-pos.p3{color:var(--bronze);}
-    .trow-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-    .trow-sub{font-size:9px;color:var(--muted);margin-top:1px;}
-    .trow-time{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:600;text-align:right;}
-    .trow-time.fl{color:var(--purple);}
-    .trow-gap{font-family:'Barlow Condensed',sans-serif;font-size:12px;color:var(--muted);text-align:right;}
-    .trow-gap.ldr{color:var(--green);font-size:10px;}
+    /* Lap by Lap */
+    .lbl-wrap{padding:0 0 80px;}
+    .lbl-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    .lbl-table{border-collapse:collapse;width:100%;min-width:360px;}
+    .lbl-table th{position:sticky;top:0;z-index:2;background:var(--surface);font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:7px 8px;border-bottom:2px solid var(--border);white-space:nowrap;text-align:right;}
+    .lbl-table th:first-child{text-align:left;padding-left:13px;position:sticky;left:0;z-index:3;}
+    .lbl-table td{padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.04);font-family:'Barlow Condensed',sans-serif;font-size:13px;text-align:right;white-space:nowrap;vertical-align:middle;}
+    .lbl-table td:first-child{text-align:left;padding-left:13px;font-weight:700;position:sticky;left:0;background:var(--bg);z-index:1;font-size:12px;}
+    .lbl-table tr:last-child td{border-bottom:none;}
+    .lbl-table tr:hover td{background:rgba(255,255,255,.03);}
+    .lbl-cell{display:inline-block;padding:2px 4px;border-radius:3px;font-size:12px;}
+    .lbl-cell.fl{background:rgba(155,89,182,.25);color:var(--purple);font-weight:700;}
+    .lbl-cell.pb{color:var(--green);}
+    .lbl-cell.slow{color:var(--muted);}
+    .lbl-cell.pit{color:var(--orange);font-style:italic;}
+    .lbl-chip{padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;white-space:nowrap;transition:all .15s;}
+    .lbl-chip.on{color:#fff;border-color:transparent;}
+    .lbl-mode{padding:4px 12px;border-radius:4px;border:1px solid var(--border);background:none;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;white-space:nowrap;transition:all .15s;}
+    .lbl-mode.on{background:var(--red);border-color:var(--red);color:#fff;}
+    .lbl-note{font-size:10px;color:var(--muted);padding:8px 13px 4px;}
+    .lbl-sec-wrap{padding:0 0 80px;}
+    .lbl-sec-driver{margin:10px 12px 6px;}
+    .lbl-sec-hdr{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+    .lbl-sec-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;text-transform:uppercase;}
+    .lbl-sec-team{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+    .lbl-sec-table{width:100%;border-collapse:collapse;background:var(--surface);border-radius:8px;overflow:hidden;border:1px solid var(--border);}
+    .lbl-sec-table th{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:6px 9px;text-align:right;border-bottom:1px solid var(--border);background:var(--surface2);}
+    .lbl-sec-table th:first-child{text-align:center;width:36px;}
+    .lbl-sec-table td{padding:6px 9px;border-bottom:1px solid rgba(255,255,255,.04);font-family:'Barlow Condensed',sans-serif;font-size:12px;text-align:right;white-space:nowrap;}
+    .lbl-sec-table td:first-child{text-align:center;font-weight:700;color:var(--muted);font-size:11px;}
+    .lbl-sec-table tr:last-child td{border-bottom:none;}
+    .s1c{color:#4db8ff;}.s2c{color:#ffd700;}.s3c{color:#ff7b7b;}
+    .sec-pb{font-weight:700;}.sec-fl{background:rgba(155,89,182,.2);border-radius:3px;padding:1px 3px;color:var(--purple);font-weight:700;}
+    .sec-pit{color:var(--orange);font-style:italic;}
 
     /* Calendar */
     .slist{padding:10px 12px;display:flex;flex-direction:column;gap:7px;}
@@ -202,7 +222,7 @@
   <div class="tabs">
     <button class="tab on" data-t="lb">Board</button>
     <button class="tab"    data-t="sx">Session</button>
-    <button class="tab"    data-t="lv">Timings</button>
+    <button class="tab"    data-t="lv">Lap by Lap</button>
     <button class="tab"    data-t="sc">Calendar</button>
   </div>
 </div>
@@ -247,8 +267,19 @@
   </div>
 
   <div class="pane" id="p-lv">
+    <div id="lv-filter" style="background:var(--surface2);border-bottom:1px solid var(--border);padding:7px 12px;display:flex;flex-direction:column;gap:7px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap;">View:</span>
+        <button id="lv-mode-lap" class="lbl-mode on" onclick="setLblMode('lap')">Lap Time</button>
+        <button id="lv-mode-sec" class="lbl-mode" onclick="setLblMode('sector')">Sectors</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;overflow-x:auto;">
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap;">Driver:</span>
+        <div id="lv-driver-chips" style="display:flex;gap:5px;flex-wrap:nowrap;"></div>
+      </div>
+    </div>
     <div id="lv-wrap">
-      <div class="smsg"><div class="ico">⏱️</div><h3>Driver Timings</h3><p>Loads with race data</p></div>
+      <div class="smsg"><div class="ico">⏱️</div><h3>Lap by Lap</h3><p>Loads with race data</p></div>
     </div>
   </div>
 
@@ -318,7 +349,7 @@ async function apiFetch(path){
 const S={
   session:null, sk:null, skLoaded:null, sessStale:true,
   drivers:{},
-  positions:[], intervals:{}, stints:{}, laps:{}, fastestLap:null,
+  positions:[], intervals:{}, stints:{}, laps:{}, allLaps:[], fastestLap:null,
   retiredDrivers:new Set(),
   weather:null,
   lapCount:0, totalLaps:58,
@@ -331,10 +362,11 @@ const S={
 let _tickTimer=null, _curTick=0, _schedDone=false, _staleTimer=null;
 
 function purgeSession(){
-  S.positions=[];S.intervals={};S.stints={};S.laps={};S.fastestLap=null;
+  S.positions=[];S.intervals={};S.stints={};S.laps={};S.allLaps=[];S.fastestLap=null;
   S.weather=null;S.lapCount=0;S.drvStd=[];S.teamStd=[];
   S.retiredDrivers=new Set();
   _schedDone=false;
+  _lblSelectedDrivers=new Set(); // reset driver filter on session change
   S.sessionResult=[];S.startingGrid=[];S.champDrivers=[];S.champTeams=[];S.champDriversRef={};
 }
 
@@ -367,8 +399,9 @@ function isRecent(sess){
   const start=sess.date_start?new Date(sess.date_start).getTime():0;
   const end=sess.date_end?new Date(sess.date_end).getTime():0;
   if(!start||start>now) return false;
-  if(end) return (now-end)<2*3600000;
-  return (now-start)<3*3600000;
+  // Consider a session "recent" for 72 hours after it ends (handles off-season browsing)
+  if(end) return (now-end)<72*3600000;
+  return (now-start)<6*3600000;
 }
 function tyreHTML(c){
   if(!c) return '';
@@ -431,7 +464,7 @@ function updateLapBar(){
 
 /* ═══ SESSION DISCOVERY ═══════════════════ */
 let _sessFetchedAt=0;
-const SESS_TTL=5*60*1000;
+const SESS_TTL     = 3*60*1000;  // 3 min cache for live; 30s for non-live (handled inline)
 
 function mostRecent(arr){
   const nowMs=Date.now();
@@ -445,26 +478,30 @@ async function findSession(){
   if(S.session&&!S.sessStale&&(now-_sessFetchedAt)<(S.isLive?SESS_TTL:30000)) return S.session;
   S.sessStale=false; _sessFetchedAt=now;
 
-  let sess=null, allSessions=[];
-  for(let yr=CURRENT_YEAR; yr>=CURRENT_YEAR-1; yr--){
+  // Search up to 2 years back; prefer live session, then most-recent started session
+  let bestSess=null, bestAllSessions=[], bestYear=null;
+  for(let yr=CURRENT_YEAR; yr>=CURRENT_YEAR-2; yr--){
     const all=await apiFetch(`/sessions?year=${yr}`).catch(()=>[]);
     if(!all.length) continue;
     const candidate=mostRecent(all);
-    if(candidate){
-      allSessions=all; S.dataYear=yr;
-      if(isLiveSess(candidate)){ sess=candidate; break; }
-      if(!sess) sess=candidate;
-      break;
-    }
+    if(!candidate) continue;
+    // Always record this as fallback if we have nothing yet
+    if(!bestSess){ bestSess=candidate; bestAllSessions=all; bestYear=yr; }
+    // If we find a live session, use it immediately
+    if(isLiveSess(candidate)){ bestSess=candidate; bestAllSessions=all; bestYear=yr; break; }
+    // If current year returned sessions, stop looking further back (don't skip to older data)
+    if(yr===CURRENT_YEAR) break;
   }
-  if(!sess) return null;
 
-  if(sess.meeting_key){
-    S.meetingSessions=allSessions
-      .filter(s=>s.meeting_key===sess.meeting_key)
+  if(!bestSess) return null;
+  S.dataYear=bestYear;
+
+  if(bestSess.meeting_key){
+    S.meetingSessions=bestAllSessions
+      .filter(s=>s.meeting_key===bestSess.meeting_key)
       .sort((a,b)=>new Date(a.date_start)-new Date(b.date_start));
   }
-  return sess;
+  return bestSess;
 }
 
 /* ═══ DNF DETECTION ═══════════════════════ */
@@ -514,7 +551,7 @@ async function bootLoad(){
       <p style="font-size:11px;max-width:320px;margin:0 auto;word-break:break-word">${err.message}</p>
       <p style="margin-top:12px;font-size:11px;color:var(--muted)">Retrying in 10s… or tap ↻</p></div>`;
     setStatus(false);
-    setTimeout(()=>{ if(!S.positions.length) bootLoad().then(startTimers); },10000);
+    setTimeout(()=>{ S.session=null; S.sessStale=true; _sessFetchedAt=0; if(!S.positions.length) bootLoad().then(startTimers); },10000);
   }
 }
 
@@ -541,7 +578,6 @@ async function loadAll(){
     const sess=await findSession(); if(!sess) return showNoData();
     S.session=sess; S.sk=sess.session_key;
     const live=isLiveSess(sess);
-    const recent=isRecent(sess);
     setStatus(live); updateHeader(sess);
 
     if(S.skLoaded!==S.sk){ purgeSession(); S.skLoaded=S.sk; S.sessStale=true; }
@@ -552,7 +588,7 @@ async function loadAll(){
       S.drivers={}; drArr.forEach(d=>{ S.drivers[d.driver_number]=d; });
     }
 
-    // Positions
+    // Positions — always fetch (not just live)
     const posArr=await apiFetch(`/position?session_key=${S.sk}`).catch(()=>[]);
     if(posArr.length){
       const lp={};
@@ -566,10 +602,11 @@ async function loadAll(){
       const li={}; intArr.forEach(i=>{ if(!li[i.driver_number]||i.date>li[i.driver_number].date) li[i.driver_number]=i; }); S.intervals=li;
     } else S.intervals={};
 
-    // Laps
+    // Laps — always load; on live refresh every tick, on finished sessions only once
     if(live||!Object.keys(S.laps).length){
       const lapArr=await apiFetch(`/laps?session_key=${S.sk}`).catch(()=>[]);
       if(lapArr.length){
+        S.allLaps=lapArr; // keep full array for Lap by Lap view
         const ll={}; lapArr.forEach(l=>{ if(!ll[l.driver_number]||l.lap_number>(ll[l.driver_number].lap_number||0)) ll[l.driver_number]=l; }); S.laps=ll;
         const valid=lapArr.filter(l=>+l.lap_duration>0);
         S.fastestLap=valid.length?valid.reduce((a,b)=>+a.lap_duration<+b.lap_duration?a:b):null;
@@ -593,9 +630,9 @@ async function loadAll(){
 
     detectRetirements();
 
-    // Session result — finished race sessions only
+    // Session result — finished race sessions only (no recency gate)
     const isRace=!!(S.session?.session_name||'').match(/race|grand prix/i);
-    if(!S.isLive&&isRace&&recent&&!S.sessionResult.length){
+    if(!S.isLive&&isRace&&!S.sessionResult.length){
       const res=await apiFetch(`/session_result?session_key=${S.sk}`).catch(()=>[]);
       if(res.length) S.sessionResult=res.sort((a,b)=>a.position-b.position);
     }
@@ -606,16 +643,23 @@ async function loadAll(){
       if(sg.length) S.startingGrid=sg;
     }
 
-    // Championship standings
+    // Championship standings — try to find most recent Race session
     if(slowTick||!S.champDrivers.length){
       let raceSk=isRace?S.sk:null;
       if(!raceSk){
         const yr=S.dataYear||CURRENT_YEAR;
-        const allSess=await apiFetch(`/sessions?year=${yr}&session_name=Race`).catch(()=>[]);
+        // Try with session_name filter first, fall back to all sessions
+        let allSess=await apiFetch(`/sessions?year=${yr}&session_name=Race`).catch(()=>[]);
+        if(!allSess.length) allSess=await apiFetch(`/sessions?year=${yr}`).catch(()=>[]);
         if(allSess.length){
-          const nowMs=Date.now();
-          const past=allSess.filter(s=>s.date_start&&new Date(s.date_start).getTime()<nowMs);
+          const nowMs2=Date.now();
+          const past=allSess.filter(s=>s.date_start&&new Date(s.date_start).getTime()<nowMs2&&(s.session_name||'').match(/race|grand prix/i));
           if(past.length) raceSk=past.sort((a,b)=>new Date(b.date_start)-new Date(a.date_start))[0].session_key;
+          // If still nothing, grab the most recent started session key
+          if(!raceSk){
+            const anyPast=allSess.filter(s=>s.date_start&&new Date(s.date_start).getTime()<nowMs2);
+            if(anyPast.length) raceSk=anyPast.sort((a,b)=>new Date(b.date_start)-new Date(a.date_start))[0].session_key;
+          }
         }
       }
       if(raceSk){
@@ -632,7 +676,7 @@ async function loadAll(){
 
     computeStandings();
     renderRaceBoard(); renderStandings(); renderSessionInfo(sess);
-    renderTimings(); renderWeather();
+    renderLapByLap(); renderWeather();
     S.lastUpdated=new Date(); resetStaleTimer();
 
     if(!_schedDone){ _schedDone=true; loadSchedule(); }
@@ -837,36 +881,212 @@ function renderWeekend(){
   html+='<div style="height:8px"></div>'; wrap.innerHTML=html;
 }
 
-function renderTimings(){
+/* ═══ LAP BY LAP STATE ════════════════════ */
+let _lblSelectedDrivers=new Set(), _lblMode='lap';
+
+function setLblMode(mode){
+  _lblMode=mode;
+  const ml=$('lv-mode-lap'), ms=$('lv-mode-sec');
+  if(ml) ml.classList.toggle('on', mode==='lap');
+  if(ms) ms.classList.toggle('on', mode==='sector');
+  renderLapByLap();
+}
+
+function fmtSec(v){
+  if(v==null||isNaN(+v)||+v<=0) return '—';
+  return (+v).toFixed(3)+'s';
+}
+
+function renderLapByLap(){
   const wrap=$('lv-wrap');
-  if(!S.positions.length){ wrap.innerHTML='<div class="smsg"><div class="ico">⏱️</div><h3>No timing data</h3></div>'; return; }
-  const gridMap={};
-  S.startingGrid.forEach(g=>{ if(g.driver_number!=null) gridMap[g.driver_number]=g.position; });
-  const hasGrid=Object.keys(gridMap).length>0;
-  let html=`<div class="timing-wrap"><div class="timing-hdr"><div>P</div><div></div><div>Driver</div><div>Last Lap</div><div>Gap</div><div style="text-align:center">${hasGrid?'Grid':''}</div><div>T</div></div>`;
-  S.positions.forEach(p=>{
-    const dr=S.drivers[p.driver_number]||{},lap=S.laps[p.driver_number],st=S.stints[p.driver_number],iv=S.intervals[p.driver_number];
-    const pos=p.position,isFl=S.fastestLap?.driver_number===p.driver_number;
-    const col=dr.team_colour?'#'+dr.team_colour:'#555';
-    const pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
-    const inPit=st?.pit_in_time&&!st?.pit_out_time,isRetired=S.retiredDrivers.has(p.driver_number);
-    let gapTxt;
-    if(pos===1) gapTxt='<div class="trow-gap ldr">LEAD</div>';
-    else if(iv?.gap_to_leader!=null){ const g=iv.gap_to_leader; gapTxt=`<div class="trow-gap">${typeof g==='string'?g:'+'+Number(g).toFixed(3)+'s'}</div>`; }
-    else gapTxt='<div class="trow-gap">—</div>';
-    const lapTxt=lap?.lap_duration?`<div class="trow-time${isFl?' fl':''}">${fmtLap(lap.lap_duration)}</div>`:'<div class="trow-time" style="color:var(--muted)">—</div>';
-    let gridTxt='<div></div>';
-    if(hasGrid){
-      const gp=gridMap[p.driver_number];
-      if(gp!=null){
-        const delta=gp-pos,sign=delta>0?'▲':delta<0?'▼':'';
-        const col2=delta>0?'var(--green)':delta<0?'var(--red)':'var(--muted)';
-        gridTxt=`<div style="text-align:center;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;color:${col2}">${sign}${delta!==0?Math.abs(delta):gp}</div>`;
-      }
-    }
-    html+=`<div class="trow${isRetired?' dnf':''}"><div class="trow-pos ${pcls}">${pos}</div><div style="width:4px;height:28px;border-radius:2px;background:${col};flex-shrink:0"></div><div style="min-width:0"><div class="trow-name">${dr.name_acronym||dr.full_name||'#'+p.driver_number}</div><div class="trow-sub">${dr.team_name||'—'}${inPit?' <span style="color:#ff8c00">·PIT</span>':''}${isRetired?' <span style="color:var(--muted)">·DNF</span>':''}</div></div>${lapTxt}${gapTxt}${gridTxt}<div style="text-align:right">${tyreHTML(st?.compound)}</div></div>`;
+  const allLaps=S.allLaps||[];
+  if(!allLaps.length){
+    wrap.innerHTML='<div class="smsg"><div class="ico">⏱️</div><h3>No lap data</h3><p>Lap data will appear once the session has started.</p></div>';
+    $('lv-driver-chips').innerHTML='';
+    return;
+  }
+
+  // Build per-driver per-lap map (include all laps, even pit-out, for sectors)
+  const driverLaps={};
+  const lapNumbers=new Set();
+  allLaps.forEach(l=>{
+    const dn=l.driver_number, ln=l.lap_number;
+    if(!driverLaps[dn]) driverLaps[dn]={};
+    driverLaps[dn][ln]=l;
+    if(l.lap_duration&&+l.lap_duration>0) lapNumbers.add(ln);
   });
-  html+='</div>'; wrap.innerHTML=html;
+
+  const driverNums=Object.keys(driverLaps).map(Number)
+    .sort((a,b)=>{
+      const pa=S.positions.find(p=>p.driver_number===a)?.position||99;
+      const pb=S.positions.find(p=>p.driver_number===b)?.position||99;
+      return pa-pb;
+    });
+
+  if(!driverNums.length){
+    wrap.innerHTML='<div class="smsg"><div class="ico">⏱️</div><h3>No timed laps yet</h3></div>';
+    return;
+  }
+
+  // Init / sync selection
+  if(_lblSelectedDrivers.size===0) driverNums.slice(0,5).forEach(dn=>_lblSelectedDrivers.add(dn));
+  [..._lblSelectedDrivers].forEach(dn=>{ if(!driverLaps[dn]) _lblSelectedDrivers.delete(dn); });
+
+  // Chips
+  const chipsEl=$('lv-driver-chips');
+  if(chipsEl){
+    let chipsHtml='';
+    driverNums.forEach(dn=>{
+      const dr=S.drivers[dn]||{};
+      const col=dr.team_colour?'#'+dr.team_colour:'#555';
+      const on=_lblSelectedDrivers.has(dn);
+      chipsHtml+=`<button class="lbl-chip${on?' on':''}" data-dn="${dn}" style="${on?'background:'+col+';border-color:'+col:''}">${dr.name_acronym||'#'+dn}</button>`;
+    });
+    chipsEl.innerHTML=chipsHtml;
+    chipsEl.querySelectorAll('.lbl-chip').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        const dn=+btn.dataset.dn;
+        if(_lblSelectedDrivers.has(dn)){ if(_lblSelectedDrivers.size>1) _lblSelectedDrivers.delete(dn); }
+        else _lblSelectedDrivers.add(dn);
+        renderLapByLap();
+      });
+    });
+  }
+
+  const selected=[...driverNums].filter(dn=>_lblSelectedDrivers.has(dn));
+  const sortedLaps=[...lapNumbers].sort((a,b)=>a-b);
+  const overallFastest=S.fastestLap?.lap_duration;
+
+  if(_lblMode==='sector'){
+    renderSectorView(wrap, selected, driverLaps, sortedLaps, overallFastest);
+  } else {
+    renderLapTimeTable(wrap, selected, driverLaps, sortedLaps, overallFastest);
+  }
+}
+
+function renderLapTimeTable(wrap, selected, driverLaps, sortedLaps, overallFastest){
+  const personalBest={};
+  let html='<div class="lbl-wrap"><div class="lbl-table-wrap"><table class="lbl-table"><thead><tr><th>Lap</th>';
+  selected.forEach(dn=>{
+    const dr=S.drivers[dn]||{};
+    const col=dr.team_colour?'#'+dr.team_colour:'#555';
+    html+=`<th style="color:${col}">${dr.name_acronym||'#'+dn}</th>`;
+  });
+  html+='</tr></thead><tbody>';
+
+  sortedLaps.forEach(ln=>{
+    html+=`<tr><td>${ln}</td>`;
+    selected.forEach(dn=>{
+      const lap=driverLaps[dn]?.[ln];
+      if(!lap||!lap.lap_duration||+lap.lap_duration<=0){ html+='<td style="color:var(--muted)">—</td>'; return; }
+      const t=+lap.lap_duration;
+      const isPit=lap.is_pit_out_lap;
+      if(!personalBest[dn]||t<personalBest[dn]) personalBest[dn]=t;
+      const isPB=!isPit&&personalBest[dn]===t;
+      const isFL=overallFastest&&Math.abs(t-+overallFastest)<0.001;
+      let cls='lbl-cell';
+      if(isFL) cls+=' fl';
+      else if(isPit) cls+=' pit';
+      else if(isPB) cls+=' pb';
+      else cls+=' slow';
+      html+=`<td><span class="${cls}">${isPit?'PIT ':''}<strong>${fmtLap(t)}</strong></span></td>`;
+    });
+    html+='</tr>';
+  });
+
+  html+='</tbody></table></div>';
+  html+=`<div class="lbl-note">🟣 Fastest lap &nbsp;&nbsp; <span style="color:var(--green)">●</span> Personal best &nbsp;&nbsp; <span style="color:var(--orange)">PIT</span> Pit-out lap</div>`;
+  html+='</div>';
+  wrap.innerHTML=html;
+}
+
+function renderSectorView(wrap, selected, driverLaps, sortedLaps, overallFastest){
+  // Pre-compute per-driver sector personal bests
+  const sectorPB={}; // { dn: { s1, s2, s3 } }
+  const sectorFL={ s1:null, s2:null, s3:null }; // overall fastest per sector
+  selected.forEach(dn=>{
+    sectorPB[dn]={s1:null,s2:null,s3:null};
+    sortedLaps.forEach(ln=>{
+      const lap=driverLaps[dn]?.[ln];
+      if(!lap||lap.is_pit_out_lap) return;
+      const s1=+lap.duration_sector_1||0, s2=+lap.duration_sector_2||0, s3=+lap.duration_sector_3||0;
+      if(s1>0&&(!sectorPB[dn].s1||s1<sectorPB[dn].s1)) sectorPB[dn].s1=s1;
+      if(s2>0&&(!sectorPB[dn].s2||s2<sectorPB[dn].s2)) sectorPB[dn].s2=s2;
+      if(s3>0&&(!sectorPB[dn].s3||s3<sectorPB[dn].s3)) sectorPB[dn].s3=s3;
+    });
+  });
+  // Overall sector fastest across all selected drivers
+  selected.forEach(dn=>{
+    if(!sectorPB[dn]) return;
+    const {s1,s2,s3}=sectorPB[dn];
+    if(s1&&(!sectorFL.s1||s1<sectorFL.s1)) sectorFL.s1=s1;
+    if(s2&&(!sectorFL.s2||s2<sectorFL.s2)) sectorFL.s2=s2;
+    if(s3&&(!sectorFL.s3||s3<sectorFL.s3)) sectorFL.s3=s3;
+  });
+
+  // One table per driver
+  let html='<div class="lbl-sec-wrap">';
+  selected.forEach(dn=>{
+    const dr=S.drivers[dn]||{};
+    const col=dr.team_colour?'#'+dr.team_colour:'#555';
+    const pb=sectorPB[dn]||{};
+
+    html+=`<div class="lbl-sec-driver">`;
+    html+=`<div class="lbl-sec-hdr"><div style="width:4px;height:28px;border-radius:2px;background:${col};flex-shrink:0"></div><div><div class="lbl-sec-name" style="color:${col}">${dr.full_name||dr.name_acronym||'#'+dn}</div><div class="lbl-sec-team">${dr.team_name||'—'}</div></div></div>`;
+    html+=`<table class="lbl-sec-table"><thead><tr>
+      <th>Lap</th>
+      <th class="s1c">S1</th><th class="s2c">S2</th><th class="s3c">S3</th>
+      <th>Total</th>
+      <th style="color:var(--muted)">I1 km/h</th><th style="color:var(--muted)">I2 km/h</th><th style="color:var(--muted)">ST km/h</th>
+    </tr></thead><tbody>`;
+
+    sortedLaps.forEach(ln=>{
+      const lap=driverLaps[dn]?.[ln];
+      const isPit=lap?.is_pit_out_lap;
+      const hasLap=lap&&lap.lap_duration&&+lap.lap_duration>0;
+      if(!hasLap){ html+=`<tr><td>${ln}</td><td colspan="7" style="color:var(--muted);text-align:center">—</td></tr>`; return; }
+
+      const total=+lap.lap_duration;
+      const s1=lap.duration_sector_1!=null?+lap.duration_sector_1:null;
+      const s2=lap.duration_sector_2!=null?+lap.duration_sector_2:null;
+      const s3=lap.duration_sector_3!=null?+lap.duration_sector_3:null;
+      const i1=lap.i1_speed!=null?lap.i1_speed:null;
+      const i2=lap.i2_speed!=null?lap.i2_speed:null;
+      const st=lap.st_speed!=null?lap.st_speed:null;
+      const isFL=overallFastest&&Math.abs(total-+overallFastest)<0.001;
+
+      function secCell(val, pbVal, flVal, cls){
+        if(!val||val<=0) return '<td style="color:var(--muted)">—</td>';
+        const isSecFL=flVal&&Math.abs(val-flVal)<0.001;
+        const isSecPB=pbVal&&Math.abs(val-pbVal)<0.001&&!isPit;
+        let inner=fmtSec(val);
+        if(isSecFL) inner=`<span class="sec-fl">${inner}</span>`;
+        else if(isSecPB) inner=`<span class="sec-pb" style="color:var(--green)">${inner}</span>`;
+        return `<td class="${cls}${isPit?' sec-pit':''}">${inner}</td>`;
+      }
+
+      const totalCls=isFL?'sec-fl':isPit?'sec-pit':'';
+      const totalInner=isFL?`<span class="sec-fl">${fmtLap(total)}</span>`:(isPit?`<span class="sec-pit">PIT ${fmtLap(total)}</span>`:`${fmtLap(total)}`);
+
+      html+=`<tr>
+        <td>${ln}</td>
+        ${secCell(s1, pb.s1, sectorFL.s1, 's1c')}
+        ${secCell(s2, pb.s2, sectorFL.s2, 's2c')}
+        ${secCell(s3, pb.s3, sectorFL.s3, 's3c')}
+        <td class="${totalCls}">${totalInner}</td>
+        <td style="color:var(--muted)">${i1??'—'}</td>
+        <td style="color:var(--muted)">${i2??'—'}</td>
+        <td style="color:var(--muted)">${st??'—'}</td>
+      </tr>`;
+    });
+
+    html+=`</tbody></table>`;
+    html+=`<div class="lbl-note"><span class="s1c">■</span> S1 &nbsp;<span class="s2c">■</span> S2 &nbsp;<span class="s3c">■</span> S3 &nbsp;&nbsp; 🟣 Session fastest sector &nbsp;&nbsp; <span style="color:var(--green)">Bold green</span> = personal best sector</div>`;
+    html+=`</div>`;
+  });
+
+  html+='</div>';
+  wrap.innerHTML=html;
 }
 
 function renderWeather(){
@@ -895,7 +1115,9 @@ async function loadSchedule(){
 
 function showNoData(){
   patchText($('rname'),'No Session Found');
-  $('lb-race-wrap').innerHTML='<div class="smsg"><div class="ico">🏎️</div><h3>No data available</h3><p>No sessions found. OpenF1 may not have data for the current season yet.</p></div>';
+  $('lb-race-wrap').innerHTML=`<div class="smsg"><div class="ico">🏎️</div><h3>No data available</h3>
+    <p>OpenF1 may not have data for the current period yet.<br>The app will keep retrying automatically.</p>
+    <p style="margin-top:12px"><button onclick="manualRefresh()" style="background:var(--red);color:#fff;border:none;border-radius:6px;padding:8px 20px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:1px;cursor:pointer;text-transform:uppercase">↻ Retry Now</button></p></div>`;
   setStatus(false);
 }
 
