@@ -272,6 +272,7 @@
         <span style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap;">View:</span>
         <button id="lv-mode-lap" class="lbl-mode on" onclick="setLblMode('lap')">Lap Time</button>
         <button id="lv-mode-sec" class="lbl-mode" onclick="setLblMode('sector')">Sectors</button>
+        <button id="lv-mode-pos" class="lbl-mode" onclick="setLblMode('position')">Positions</button>
       </div>
       <div style="display:flex;align-items:center;gap:8px;overflow-x:auto;">
         <span style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap;">Driver:</span>
@@ -351,7 +352,7 @@ async function apiFetch(path, retries=2){
 const S={
   session:null, sk:null, skLoaded:null, sessStale:true,
   drivers:{},
-  positions:[], intervals:{}, stints:{}, laps:{}, allLaps:[], fastestLap:null,
+  positions:[], allPositions:[], intervals:{}, stints:{}, laps:{}, allLaps:[], fastestLap:null,
   retiredDrivers:new Set(),
   weather:null,
   lapCount:0, totalLaps:58,
@@ -364,7 +365,7 @@ const S={
 let _tickTimer=null, _curTick=0, _schedDone=false, _staleTimer=null;
 
 function purgeSession(){
-  S.positions=[];S.intervals={};S.stints={};S.laps={};S.allLaps=[];S.fastestLap=null;
+  S.positions=[];S.allPositions=[];S.intervals={};S.stints={};S.laps={};S.allLaps=[];S.fastestLap=null;
   S.weather=null;S.lapCount=0;S.drvStd=[];S.teamStd=[];
   S.retiredDrivers=new Set();
   _schedDone=false;
@@ -612,6 +613,7 @@ async function loadAll(){
     // Positions — always fetch (not just live)
     const posArr=await apiFetch(`/position?session_key=${S.sk}`).catch(()=>[]);
     if(posArr.length){
+      S.allPositions=posArr; // full history for lap-by-lap position view
       const lp={};
       posArr.forEach(p=>{ if(!lp[p.driver_number]||p.date>lp[p.driver_number].date) lp[p.driver_number]=p; });
       S.positions=Object.values(lp).sort((a,b)=>a.position-b.position);
@@ -953,9 +955,10 @@ let _lblSelectedDrivers=new Set(), _lblMode='lap';
 
 function setLblMode(mode){
   _lblMode=mode;
-  const ml=$('lv-mode-lap'), ms=$('lv-mode-sec');
+  const ml=$('lv-mode-lap'), ms=$('lv-mode-sec'), mp=$('lv-mode-pos');
   if(ml) ml.classList.toggle('on', mode==='lap');
   if(ms) ms.classList.toggle('on', mode==='sector');
+  if(mp) mp.classList.toggle('on', mode==='position');
   renderLapByLap();
 }
 
@@ -1026,6 +1029,8 @@ function renderLapByLap(){
 
   if(_lblMode==='sector'){
     renderSectorView(wrap, selected, driverLaps, sortedLaps, overallFastest);
+  } else if(_lblMode==='position'){
+    renderPositionView(wrap, selected, driverLaps, sortedLaps);
   } else {
     renderLapTimeTable(wrap, selected, driverLaps, sortedLaps, overallFastest);
   }
@@ -1156,7 +1161,104 @@ function renderSectorView(wrap, selected, driverLaps, sortedLaps, overallFastest
   wrap.innerHTML=html;
 }
 
-function renderWeather(){
+function renderPositionView(wrap, selected, driverLaps, sortedLaps){
+  // Build grid position map from S.startingGrid
+  const gridMap={};
+  S.startingGrid.forEach(g=>{ if(g.driver_number!=null) gridMap[+g.driver_number]=+g.position; });
+  const hasGrid=Object.keys(gridMap).length>0;
+
+  // Build a per-driver sorted position history: [{ts, position}]
+  // S.allPositions is the raw array from /position endpoint
+  const posHistory={}; // { driver_number: [{ts, pos}] sorted by ts }
+  S.allPositions.forEach(p=>{
+    const dn=+p.driver_number;
+    if(!posHistory[dn]) posHistory[dn]=[];
+    posHistory[dn].push({ts:new Date(p.date).getTime(), pos:+p.position});
+  });
+  // Sort each driver's history chronologically
+  Object.values(posHistory).forEach(arr=>arr.sort((a,b)=>a.ts-b.ts));
+
+  // Helper: get a driver's position at a given timestamp
+  // Returns the last known position at or before that time
+  function posAt(dn, ts){
+    const hist=posHistory[dn];
+    if(!hist||!hist.length) return null;
+    let result=null;
+    for(let i=0;i<hist.length;i++){
+      if(hist[i].ts<=ts) result=hist[i].pos;
+      else break;
+    }
+    return result;
+  }
+
+  // Build table — rows = laps, columns = selected drivers
+  // For each cell: position at end of that lap (use lap date_start + lap_duration as approx end time)
+  let html='<div class="lbl-wrap"><div class="lbl-table-wrap"><table class="lbl-table"><thead><tr>';
+  html+=`<th>Lap</th>`;
+  selected.forEach(dn=>{
+    const dr=S.drivers[dn]||{};
+    const col=dr.team_colour?'#'+dr.team_colour:'#555';
+    const grid=hasGrid&&gridMap[dn]?`<span style="font-size:9px;color:var(--muted)"> P${gridMap[dn]}</span>`:'';
+    html+=`<th style="color:${col}">${dr.name_acronym||'#'+dn}${grid}</th>`;
+  });
+  html+='</tr></thead><tbody>';
+
+  // Track previous lap's position per driver to show change arrows
+  const prevPos={};
+
+  sortedLaps.forEach(ln=>{
+    html+=`<tr><td>${ln}</td>`;
+    selected.forEach(dn=>{
+      const lap=driverLaps[dn]?.[ln];
+      // Get approximate end-of-lap timestamp
+      let lapEndTs=null;
+      if(lap?.date_start){
+        const lapStart=new Date(lap.date_start).getTime();
+        const dur=lap.lap_duration?+lap.lap_duration*1000:0;
+        lapEndTs=lapStart+(dur||60000); // fallback 1 min if no duration
+      }
+
+      const pos=lapEndTs?posAt(dn, lapEndTs):null;
+
+      if(pos==null){
+        html+='<td style="color:var(--muted)">—</td>';
+        return;
+      }
+
+      const prev=prevPos[dn]??null;
+      prevPos[dn]=pos;
+
+      // Delta vs previous lap
+      let deltaHtml='';
+      if(prev!==null&&prev!==pos){
+        const diff=prev-pos; // positive = gained positions (lower number = better)
+        const arrow=diff>0?'▲':'▼';
+        const col2=diff>0?'var(--green)':'var(--red)';
+        deltaHtml=`<span style="font-size:9px;color:${col2};margin-left:2px">${arrow}${Math.abs(diff)}</span>`;
+      }
+
+      // Net gain/loss vs grid start
+      let netHtml='';
+      if(hasGrid&&gridMap[dn]){
+        const net=gridMap[dn]-pos; // positive = gained vs grid
+        if(net>0) netHtml=`<span style="font-size:9px;color:var(--green)"> +${net}</span>`;
+        else if(net<0) netHtml=`<span style="font-size:9px;color:var(--red)"> ${net}</span>`;
+      }
+
+      // Position colour: P1=gold, P2=silver, P3=bronze, rest=text
+      const posCol=pos===1?'var(--gold)':pos===2?'var(--silver)':pos===3?'var(--bronze)':'var(--text)';
+      html+=`<td><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:${posCol}">${pos}</span>${deltaHtml}${netHtml}</td>`;
+    });
+    html+='</tr>';
+  });
+
+  html+='</tbody></table></div>';
+  html+=`<div class="lbl-note">`;
+  if(hasGrid) html+=`Grid start shown in header (P#) &nbsp;&nbsp; `;
+  html+=`<span style="color:var(--green)">▲</span> Gained &nbsp; <span style="color:var(--red)">▼</span> Lost vs prev lap &nbsp;&nbsp; Net vs grid start shown in <span style="color:var(--green)">green</span>/<span style="color:var(--red)">red</span>`;
+  html+=`</div></div>`;
+  wrap.innerHTML=html;
+}
   const wrap=$('sx-wx-wrap'),wx=S.weather;
   if(!wx){ wrap.innerHTML='<div class="smsg"><div class="ico">🌤️</div><h3>No weather data</h3><p>Weather available during active sessions</p></div>'; return; }
   const cond=wx.rainfall?'🌧️ WET':'☀️ DRY',condCol=wx.rainfall?'#1e90ff':'#00d27f';
