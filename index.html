@@ -16,7 +16,7 @@
     :root{
       --red:#e10600;--red-dim:#7a0300;--gold:#f5a623;--silver:#c0c0c0;--bronze:#cd7f32;
       --bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--border:#222;--text:#f0f0f0;
-      --muted:#666;--green:#00d27f;--purple:#9b59b6;
+      --muted:#666;--green:#00d27f;--purple:#9b59b6;--orange:#ff8c00;
     }
     *{box-sizing:border-box;margin:0;padding:0;}
     body{font-family:'Barlow',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
@@ -30,11 +30,27 @@
     .dot.off{background:var(--muted);animation:none;}
     @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(.7);}}
 
+    /* Stale data bar */
+    #stale-bar{display:none;background:rgba(255,140,0,.1);border-bottom:1px solid rgba(255,140,0,.2);
+      padding:4px 16px;font-size:10px;color:var(--orange);letter-spacing:.5px;text-align:center;cursor:pointer;}
+    #stale-bar.show{display:block;}
+
+    /* Pull-to-refresh */
+    #ptr{position:fixed;top:0;left:0;right:0;z-index:500;height:0;overflow:hidden;
+      background:var(--surface);border-bottom:1px solid var(--border);
+      display:flex;align-items:center;justify-content:center;transition:height .15s ease;}
+    .ptr-inner{display:flex;align-items:center;gap:8px;font-family:'Barlow Condensed',sans-serif;
+      font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);}
+    #ptr.ready .ptr-inner{color:var(--green);}
+    #ptr-icon{transition:transform .25s ease;}
+    #ptr.ready #ptr-icon{transform:rotate(180deg);}
+
     #raceinfo{background:var(--surface);border-bottom:1px solid var(--border);padding:8px 16px;}
     .ri{max-width:640px;margin:0 auto;}
     .rname{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px;text-transform:uppercase;letter-spacing:1px;}
     .rmeta{font-size:11px;color:var(--muted);margin-top:2px;display:flex;gap:10px;}
 
+    /* Lap bar — always visible once session data loads */
     #lapbar{background:linear-gradient(90deg,var(--red-dim),transparent);border-bottom:1px solid var(--border);padding:7px 16px;display:none;}
     .lbi{max-width:640px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;}
     .lapnum{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;}
@@ -47,7 +63,6 @@
     .tabs{display:flex;max-width:640px;margin:0 auto;}
     .tab{flex:1;padding:10px 2px;background:none;border:none;border-bottom:3px solid transparent;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;transition:all .2s;}
     .tab.on{color:var(--text);border-bottom-color:var(--red);}
-
     .subtabwrap{background:var(--surface2);border-bottom:1px solid var(--border);}
     .subtabs{display:flex;max-width:640px;margin:0 auto;padding:0 12px;gap:2px;}
     .subtab{padding:7px 16px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;transition:all .2s;}
@@ -57,14 +72,17 @@
     .pane{display:none;}.pane.on{display:block;}
     .subpane{display:none;}.subpane.on{display:block;}
 
-    /* Driver race cards */
+    /* Driver cards — DOM-diffed, DNF dimming */
     .dlist{padding:8px 12px;display:flex;flex-direction:column;gap:5px;}
-    .dcard{background:var(--surface);border:1px solid var(--border);border-radius:8px;display:grid;grid-template-columns:34px 4px 1fr auto;align-items:center;gap:10px;padding:9px 11px;position:relative;overflow:hidden;}
+    .dcard{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+      display:grid;grid-template-columns:34px 4px 1fr auto;align-items:center;
+      gap:10px;padding:9px 11px;position:relative;overflow:hidden;transition:opacity .3s;}
     .dcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;}
     .dcard.p1::before{background:var(--gold);}
     .dcard.p2::before{background:var(--silver);}
     .dcard.p3::before{background:var(--bronze);}
     .dcard.fl::before{background:var(--purple);}
+    .dcard.dnf{opacity:.4;}
     .posn{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:20px;color:var(--muted);text-align:center;line-height:1;}
     .dcard.p1 .posn{color:var(--gold);}
     .dcard.p2 .posn{color:var(--silver);}
@@ -73,13 +91,12 @@
     .dinfo{min-width:0;}
     .dname{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .dteam{font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-top:1px;}
-    .dextra{display:flex;align-items:center;gap:5px;margin-top:3px;}
+    .dextra{display:flex;align-items:center;gap:5px;margin-top:3px;flex-wrap:wrap;}
     .dright{text-align:right;flex-shrink:0;}
     .gap{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;display:block;}
     .gap.ldr{color:var(--green);font-size:11px;}
     .llap{font-size:10px;color:var(--muted);margin-top:2px;display:block;}
     .llap.fl{color:var(--purple);font-weight:600;}
-
     .tyre{width:20px;height:20px;border-radius:50%;border:2px solid;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:10px;flex-shrink:0;}
     .tyre.soft{border-color:#e10600;color:#e10600;}
     .tyre.medium{border-color:#ffd600;color:#ffd600;}
@@ -87,6 +104,7 @@
     .tyre.inter{border-color:#00d27f;color:#00d27f;}
     .tyre.wet{border-color:#1e90ff;color:#1e90ff;}
     .pit-badge{background:rgba(255,140,0,.2);color:#ff8c00;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;letter-spacing:1px;}
+    .dnf-badge{background:rgba(100,100,100,.2);color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;letter-spacing:1px;}
 
     /* Standings */
     .standings-wrap{padding:8px 12px;}
@@ -104,18 +122,19 @@
     .st-barfill{height:100%;border-radius:2px;}
     .st-note{font-size:10px;color:var(--muted);padding:8px 12px;text-align:center;border-top:1px solid var(--border);}
 
-    /* Session info */
+    /* Session */
     .igrid{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:10px 12px;}
     .icard{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 13px;}
     .ilbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;}
     .ival{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;margin-top:2px;}
     .ival.green{color:var(--green);}.ival.red{color:var(--red);}.ival.purple{color:var(--purple);}
 
-    /* Timing table */
+    /* Timings */
     .timing-wrap{padding:6px 12px 12px;}
     .timing-hdr{display:grid;grid-template-columns:26px 4px 1fr 80px 72px 26px;gap:6px;align-items:center;padding:5px 8px;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);margin-bottom:4px;}
     .timing-hdr div:nth-child(4),.timing-hdr div:nth-child(5){text-align:right;}
     .trow{display:grid;grid-template-columns:26px 4px 1fr 80px 72px 26px;gap:6px;align-items:center;padding:7px 8px;background:var(--surface);border-radius:6px;margin-bottom:3px;}
+    .trow.dnf{opacity:.4;}
     .trow-pos{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:16px;color:var(--muted);text-align:center;}
     .trow-pos.p1{color:var(--gold);}.trow-pos.p2{color:var(--silver);}.trow-pos.p3{color:var(--bronze);}
     .trow-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -138,7 +157,62 @@
     .srnd{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:26px;color:var(--border);}
     .scard.now .srnd{color:var(--red);}
 
-    50%{transform:translateY(-5px);opacity:1;}}
+    /* Position Changes */
+    .pc-wrap{padding:0 12px 10px;}
+    .pc-block{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+    .pc-hdr{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;}
+    .pc-ts{font-size:10px;color:var(--muted);margin-left:auto;font-family:'Barlow',sans-serif;font-weight:400;letter-spacing:0;}
+    .pc-list{display:flex;flex-direction:column;}
+    .pc-row{display:grid;grid-template-columns:1fr auto;align-items:center;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.04);gap:8px;}
+    .pc-row:last-child{border-bottom:none;}
+    .pc-left{display:flex;align-items:center;gap:8px;}
+    .pc-badge{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:18px;min-width:26px;text-align:center;}
+    .pc-badge.up{color:var(--green);}.pc-badge.dn{color:var(--red);}
+    .pc-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;text-transform:uppercase;}
+    .pc-team{font-size:10px;color:var(--muted);}
+    .pc-arrow{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;display:flex;align-items:center;gap:5px;white-space:nowrap;}
+    .pc-arrow.up{color:var(--green);}.pc-arrow.dn{color:var(--red);}
+    .pc-none{font-size:12px;color:var(--muted);padding:10px 12px;font-style:italic;}
+
+    /* Radio transcript */
+    .radio-transcript{font-size:13px;line-height:1.5;color:var(--text);margin-top:6px;padding:6px 9px;background:var(--surface2);border-radius:5px;border-left:2px solid var(--gold);}
+    .radio-transcript.pending{color:var(--muted);font-style:italic;}
+    .radio-transcript.err{color:var(--muted);font-style:italic;border-left-color:var(--border);}
+    .retry-btn{margin-top:5px;background:none;border:1px solid var(--border);border-radius:4px;color:var(--muted);font-size:10px;padding:2px 8px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;display:inline-block;}
+    .retry-btn:hover{border-color:var(--gold);color:var(--gold);}
+
+    /* Live Feed */
+    .lf-wrap{padding:8px 12px 16px;display:flex;flex-direction:column;gap:8px;}
+    .lf-hdr{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);padding:10px 0 5px;border-bottom:1px solid var(--border);margin-bottom:7px;display:flex;align-items:center;gap:6px;}
+    .lf-hdr span{font-size:16px;}
+    .lf-count{margin-left:auto;background:var(--surface2);border-radius:10px;padding:1px 7px;font-size:10px;color:var(--muted);}
+    .lf-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;border-left:3px solid var(--border);}
+    .lf-item.radio{border-left-color:var(--gold);}
+    .lf-item.ctrl{border-left-color:var(--red);}
+    .lf-item.ctrl.sc{border-left-color:var(--gold);background:rgba(245,166,35,.04);}
+    .lf-item.ctrl.vsc{border-left-color:var(--gold);background:rgba(245,166,35,.03);}
+    .lf-item.ctrl.redflag{border-left-color:#ff4444;background:rgba(225,6,0,.07);}
+    .lf-item.lap{border-left-color:var(--purple);}
+    .lf-alert{display:inline-block;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:4px;margin-bottom:6px;}
+    .lf-alert.sc{background:rgba(245,166,35,.15);color:var(--gold);}
+    .lf-alert.vsc{background:rgba(245,166,35,.12);color:var(--gold);}
+    .lf-alert.redflag{background:rgba(225,6,0,.15);color:#ff6666;}
+    .lf-meta{font-size:10px;color:var(--muted);margin-bottom:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+    .lf-driver{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;}
+    .lf-msg{font-size:13px;line-height:1.5;}
+    .lf-flag{display:inline-block;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:10px;letter-spacing:1px;padding:1px 6px;border-radius:3px;text-transform:uppercase;}
+    .lf-flag.green{background:rgba(0,210,127,.15);color:#00d27f;}
+    .lf-flag.yellow{background:rgba(255,214,0,.15);color:#ffd600;}
+    .lf-flag.red{background:rgba(225,6,0,.2);color:#ff6666;}
+    .lf-flag.sc{background:rgba(245,166,35,.2);color:var(--gold);}
+    .lf-flag.vsc{background:rgba(245,166,35,.15);color:var(--gold);}
+    .lf-flag.drs{background:rgba(0,210,127,.12);color:#00d27f;}
+    .lf-flag.chk{background:rgba(255,255,255,.1);color:#f0f0f0;}
+    .lf-empty{font-size:12px;color:var(--muted);padding:8px 0;font-style:italic;}
+    .lf-notlive{text-align:center;padding:44px 24px;color:var(--muted);}
+    .lf-notlive .ico{font-size:36px;margin-bottom:10px;}
+    .lf-notlive h3{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;color:var(--text);margin-bottom:5px;}
+    .lf-notlive p{font-size:12px;line-height:1.5;}
 
     /* States */
     .smsg{text-align:center;padding:44px 24px;color:var(--muted);font-size:13px;}
@@ -156,43 +230,27 @@
     .fn{text-align:center;font-size:10px;color:var(--muted);padding:7px 16px;border-top:1px solid var(--border);}
     details.wknd-item summary::-webkit-details-marker{display:none;}
     details.wknd-item[open] summary div:last-child{transform:rotate(180deg);}
-    /* Live Feed */
-    .lf-wrap{padding:8px 12px 16px;display:flex;flex-direction:column;gap:8px;}
-    .lf-section{}
-    .lf-hdr{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);padding:10px 0 5px;border-bottom:1px solid var(--border);margin-bottom:7px;display:flex;align-items:center;gap:6px;}
-    .lf-hdr span{font-size:16px;}
-    .lf-count{margin-left:auto;background:var(--surface2);border-radius:10px;padding:1px 7px;font-size:10px;color:var(--muted);}
-    .lf-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;border-left:3px solid var(--border);}
-    .lf-item.radio{border-left-color:#f5a623;}
-    .lf-item.ctrl{border-left-color:#e10600;}
-    .lf-item.lap{border-left-color:#9b59b6;}
-    .lf-meta{font-size:10px;color:var(--muted);margin-bottom:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
-    .lf-driver{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;}
-    .lf-time{font-size:10px;color:var(--muted);}
-    .lf-msg{font-size:13px;line-height:1.5;}
-    .lf-flag{display:inline-block;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:10px;letter-spacing:1px;padding:1px 6px;border-radius:3px;text-transform:uppercase;}
-    .lf-flag.green{background:rgba(0,210,127,.15);color:#00d27f;}
-    .lf-flag.yellow{background:rgba(255,214,0,.15);color:#ffd600;}
-    .lf-flag.red{background:rgba(225,6,0,.15);color:#e10600;}
-    .lf-flag.sc{background:rgba(245,166,35,.15);color:#f5a623;}
-    .lf-flag.vsc{background:rgba(245,166,35,.15);color:#f5a623;}
-    .lf-flag.drs{background:rgba(0,210,127,.12);color:#00d27f;}
-    .lf-flag.chk{background:rgba(255,255,255,.1);color:#f0f0f0;}
-    .lf-empty{font-size:12px;color:var(--muted);padding:8px 0;font-style:italic;}
-    .lf-audio{display:flex;align-items:center;gap:8px;margin-top:5px;}
-    .lf-audio audio{flex:1;height:28px;min-width:0;}
-    .lf-play{background:var(--surface2);border:1px solid var(--border);border-radius:4px;
-      color:var(--text);font-size:11px;padding:3px 8px;cursor:pointer;white-space:nowrap;}
-    .lf-play:hover{border-color:var(--gold);}
   </style>
 </head>
 <body>
+
+<div id="ptr">
+  <div class="ptr-inner">
+    <svg id="ptr-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+    </svg>
+    <span id="ptr-label">Pull to refresh</span>
+  </div>
+</div>
+
 <header>
   <div class="hdr">
     <div class="logo">F1 <span>Live Updates</span></div>
     <div class="livebadge"><div class="dot off" id="dot"></div><span id="dotlbl">LOADING</span></div>
   </div>
 </header>
+
+<div id="stale-bar" onclick="manualRefresh()">⚠ Data may be stale — tap to refresh</div>
 
 <div id="raceinfo">
   <div class="ri">
@@ -211,18 +269,17 @@
 
 <div class="tabwrap">
   <div class="tabs">
-    <button class="tab on"  data-t="lb">Board</button>
-    <button class="tab"     data-t="sx">Session</button>
-    <button class="tab"     data-t="lv">Live Feed</button>
-    <button class="tab"     data-t="sc">Calendar</button>
+    <button class="tab on" data-t="lb">Board</button>
+    <button class="tab"    data-t="sx">Session</button>
+    <button class="tab"    data-t="lv">Live Feed</button>
+    <button class="tab"    data-t="sc">Calendar</button>
   </div>
 </div>
 
 <main>
-  <!-- BOARD -->
   <div class="pane on" id="p-lb">
     <div class="subtabwrap">
-      <div class="subtabs" id="lb-subtabs">
+      <div class="subtabs">
         <button class="subtab on" data-s="lb-race">Race</button>
         <button class="subtab"    data-s="lb-drv">Drivers</button>
         <button class="subtab"    data-s="lb-team">Teams</button>
@@ -239,10 +296,9 @@
     </div></div>
   </div>
 
-  <!-- SESSION -->
   <div class="pane" id="p-sx">
     <div class="subtabwrap">
-      <div class="subtabs" id="sx-subtabs">
+      <div class="subtabs">
         <button class="subtab on" data-s="sx-info">Info</button>
         <button class="subtab"    data-s="sx-weekend">Weekend</button>
         <button class="subtab"    data-s="sx-timing">Timings</button>
@@ -263,19 +319,17 @@
     </div></div>
   </div>
 
-  <!-- LIVE FEED -->
   <div class="pane" id="p-lv">
     <div id="lv-wrap">
       <div class="smsg"><div class="ico">📡</div><h3>Live Feed</h3><p>Team radio, race control & lap notes appear here during a session.</p></div>
     </div>
   </div>
 
-  <!-- CALENDAR -->
   <div class="pane" id="p-sc">
     <div id="sc-wrap"><div class="smsg"><div class="ico">📅</div><h3>Loading calendar…</h3></div></div>
   </div>
 
-  <div class="fn">F1 Live Updates · Live 12s · Idle 2min · OpenF1 API</div>
+  <div class="fn">F1 Live Updates · Live 12s · Idle 2min (session+positions only) · OpenF1 API</div>
 </main>
 
 <button id="fab" title="Refresh now">
@@ -287,1196 +341,754 @@
 <script>
 'use strict';
 
-/* ═══════════════════════════════════════════
-   CONSTANTS
-═══════════════════════════════════════════ */
+/* ═══ CONSTANTS ═══════════════════════════ */
 const BASE         = 'https://api.openf1.org/v1';
 const CURRENT_YEAR = new Date().getFullYear();
-
-/* ── Poll rates ─────────────────────────────────────────────────────────────
-   Live cycle has 5 sequential API calls. With RL_GAP=1s that drains in 5s.
-   TICK_LIVE=12s gives 7s headroom so the queue fully clears each cycle.
-   Result: ~25 req/min live (comfortable), ~1.5 req/min idle (negligible).
-
-   Slow endpoints (stints, weather) don't change every lap — poll them on a
-   longer sub-cycle so the effective live call count drops to 3 on most ticks.
-   ────────────────────────────────────────────────────────────────────────── */
-const TICK_LIVE    = 12000;  // 12s between live polls  → ~25 req/min
-const TICK_IDLE    = 120000; // 2 min between idle polls → ~1.5 req/min
-const RL_GAP       = 1000;   // 1s between each API call (was 5s — caused queue runaway)
-const SLOW_EVERY   = 4;      // fetch stints+weather every Nth live tick (every ~48s)
-
-/* F1 points */
+const TICK_LIVE    = 12000;
+const TICK_IDLE    = 120000;
+const RL_GAP       = 1000;
+const SLOW_EVERY   = 4;
+const STALE_MS     = 35000;  // show stale bar after 35s without successful update
+const PTR_THRESH   = 68;     // px of pull before triggering refresh
 const PTS          = [25,18,15,12,10,8,6,4,2,1];
+const CAP_RADIO    = 30;
+const CAP_CTRL     = 40;
+const CAP_LAPS     = 44;
+const CAP_RL_Q     = 12;
 
-/* Memory caps — hard limits on every array in state */
-const CAP_RADIO    = 30;   // team radio clips kept in memory
-const CAP_CTRL     = 40;   // race control messages kept
-const CAP_LAPS     = 44;   // lap comment entries (max 2 × 22 drivers)
-const CAP_RL_Q     = 12;   // max pending API calls in rate-limit queue
-
-/* ═══════════════════════════════════════════
-   RATE LIMITER
-   All OpenF1 API calls are serialised through
-   this queue — max 1 request every RL_GAP ms.
-═══════════════════════════════════════════ */
-let _rlLast = 0, _rlQ = [], _rlBusy = false;
-
+/* ═══ RATE LIMITER ════════════════════════ */
+let _rlLast=0, _rlQ=[], _rlBusy=false;
 function apiQ(fn){
-  return new Promise((res, rej) => {
-    _rlQ.push({fn, res, rej});
-    if(!_rlBusy) _drain();
-  });
+  return new Promise((res,rej)=>{ _rlQ.push({fn,res,rej}); if(!_rlBusy) _drain(); });
 }
 function _drain(){
-  /* Shed excess entries if queue gets too deep — prevents runaway backlog */
-  while(_rlQ.length > CAP_RL_Q){
-    const {rej} = _rlQ.pop();
-    rej(new Error('Rate-limit queue overflow — request dropped'));
-  }
-  if(!_rlQ.length){ _rlBusy = false; return; }
-  _rlBusy = true;
-  const delay = Math.max(0, RL_GAP - (Date.now() - _rlLast));
-  setTimeout(async () => {
-    const {fn, res, rej} = _rlQ.shift();
-    _rlLast = Date.now();
-    try  { res(await fn()); }
-    catch(e){ rej(e); }
-    finally { _drain(); }
-  }, delay);
+  while(_rlQ.length>CAP_RL_Q){ const{rej}=_rlQ.pop(); rej(new Error('RL overflow')); }
+  if(!_rlQ.length){ _rlBusy=false; return; }
+  _rlBusy=true;
+  const delay=Math.max(0,RL_GAP-(Date.now()-_rlLast));
+  setTimeout(async()=>{
+    const{fn,res,rej}=_rlQ.shift(); _rlLast=Date.now();
+    try{ res(await fn()); } catch(e){ rej(e); } finally{ _drain(); }
+  },delay);
 }
-
-/* Raw fetch — goes through rate limiter */
 async function apiFetch(path){
-  return apiQ(async () => {
-    const r = await fetch(BASE + path);
-    if(!r.ok){
-      const txt = await r.text().catch(()=>'');
-      throw new Error(`${r.status}: ${txt.slice(0,80)||path}`);
-    }
+  return apiQ(async()=>{
+    const r=await fetch(BASE+path);
+    if(!r.ok){ const t=await r.text().catch(()=>''); throw new Error(`${r.status}: ${t.slice(0,80)||path}`); }
     return r.json();
   });
 }
 
-/* ═══════════════════════════════════════════
-   STATE
-═══════════════════════════════════════════ */
-const S = {
-  /* Session — cached, only re-fetched when stale */
-  session:   null,
-  sk:        null,
-  skLoaded:  null,   // session_key for which drivers were loaded
-  sessStale: true,   // force session re-discovery on first run
-
-  /* Driver map: driver_number → driver object */
-  drivers: {},
-
-  /* Race data */
-  positions:  [],   // sorted by position
-  intervals:  {},   // driver_number → latest interval
-  stints:     {},   // driver_number → latest stint
-  laps:       {},   // driver_number → latest lap
-  fastestLap: null,
-
-  /* Weather */
-  weather: null,
-
-  /* Computed */
-  lapCount:  0,
-  totalLaps: 58,
-  drvStd:    [],   // driver standings
-  teamStd:   [],   // team standings
-
-  isLive:      false,
-  lastUpdated: null,
-  dataYear:    null,
-  tickN:       0,    // increments each loadAll — used for slow-poll cadence
-  meetingSessions: [], // all sessions for the current meeting weekend
-  /* Live feed data — appended, never overwritten */
-  radioMsgs:  [],   // team_radio records
-  ctrlMsgs:   [],   // race_control records
-  lapComments:[],   // lap comment records
-  _liveSk:    null,  // session_key for which live feed was last fetched
+/* ═══ STATE ═══════════════════════════════ */
+const S={
+  session:null, sk:null, skLoaded:null, sessStale:true,
+  drivers:{},
+  positions:[], intervals:{}, stints:{}, laps:{}, fastestLap:null,
+  retiredDrivers: new Set(),
+  weather:null,
+  lapCount:0, totalLaps:58,
+  drvStd:[], teamStd:[],
+  isLive:false, lastUpdated:null, dataYear:null,
+  tickN:0, meetingSessions:[],
+  radioMsgs:[], ctrlMsgs:[], lapComments:[],
+  _liveSk:null,
+  prevPositions:{}, posChanges:[],
+  radioTranscripts:{},
 };
+let _tickTimer=null,_curTick=0,_schedDone=false,_liveDone=false;
+let _lastRadioTs=null,_lastCtrlTs=null,_staleTimer=null;
 
-let _tickTimer = null, _curTick = 0;
-let _schedDone = false;
-let _liveDone  = false; // set true once we do first live feed fetch for a session
-let _lastRadioTs  = null; // ISO timestamp of last seen radio message (for incremental fetch)
-let _lastCtrlTs   = null; // ISO timestamp of last seen control message
-
-/* Purge ALL session-scoped data when session_key changes.
-   Keeps only the current session in memory — everything from the
-   previous session is dropped immediately (positions, timings,
-   live feed, radio, race control). No stale data ever persists. */
 function purgeSession(){
-  /* Timing / position data */
-  S.positions  = [];
-  S.intervals  = {};
-  S.stints     = {};
-  S.laps       = {};
-  S.fastestLap = null;
-  S.weather    = null;
-  S.lapCount   = 0;
-  S.drvStd     = [];
-  S.teamStd    = [];
-  /* Live feed — cleared so only current-session messages show */
-  S.radioMsgs   = [];
-  S.ctrlMsgs    = [];
-  S.lapComments = [];
-  S._liveSk     = null;
-  _liveDone     = false;
-  _lastRadioTs  = null;
-  _lastCtrlTs   = null;
+  S.positions=[];S.intervals={};S.stints={};S.laps={};S.fastestLap=null;
+  S.weather=null;S.lapCount=0;S.drvStd=[];S.teamStd=[];
+  S.retiredDrivers=new Set();
+  S.radioMsgs=[];S.ctrlMsgs=[];S.lapComments=[];S._liveSk=null;
+  _liveDone=false;_lastRadioTs=null;_lastCtrlTs=null;
+  S.prevPositions={};S.posChanges=[];S.radioTranscripts={};
 }
 
-/* ═══════════════════════════════════════════
-   DOM
-═══════════════════════════════════════════ */
-const $ = id => document.getElementById(id);
+/* ═══ DOM HELPERS ═════════════════════════ */
+const $=id=>document.getElementById(id);
+function patchText(el,t){ if(el&&el.textContent!==String(t)) el.textContent=t; }
 
 function setStatus(live){
-  $('dot').className = 'dot' + (live ? '' : ' off');
-  $('dotlbl').textContent = live ? 'LIVE' : 'LATEST';
-  S.isLive = live;
+  $('dot').className='dot'+(live?'':' off');
+  $('dotlbl').textContent=live?'LIVE':'LATEST';
+  S.isLive=live;
 }
-
 function fmtLap(sec){
-  if(sec == null || isNaN(+sec) || +sec <= 0) return '—';
-  const v = +sec, m = Math.floor(v/60), s = (v%60).toFixed(3);
-  const [w,d] = s.split('.');
+  if(sec==null||isNaN(+sec)||+sec<=0) return '—';
+  const v=+sec,m=Math.floor(v/60),s=(v%60).toFixed(3),[w,d]=s.split('.');
   return `${m}:${w.padStart(2,'0')}.${d}`;
 }
-
-/* Is a session currently live (started but ended <4h ago)? */
-function isLive(sess){
+function isLiveSess(sess){
   if(!sess) return false;
-  const now = Date.now();
-  const start = sess.date_start ? new Date(sess.date_start).getTime() : 0;
-  const end   = sess.date_end   ? new Date(sess.date_end).getTime()   : 0;
-  /* Live: started AND (not yet ended OR ended <4h ago) */
-  if(start > now) return false;              // hasn't started
-  if(!end) return true;                      // no end time = assume live
-  return (now - end) < 4 * 3600 * 1000;    // ended within 4 hours
+  const now=Date.now(),start=sess.date_start?new Date(sess.date_start).getTime():0,end=sess.date_end?new Date(sess.date_end).getTime():0;
+  if(start>now) return false;
+  if(!end) return true;
+  return (now-end)<4*3600000;
+}
+function tyreHTML(c){
+  if(!c) return '';
+  const map={SOFT:'S',MEDIUM:'M',HARD:'H',INTERMEDIATE:'I',WET:'W'};
+  const cls=c==='INTERMEDIATE'?'inter':c.toLowerCase();
+  return `<div class="tyre ${cls}">${map[c]||c[0]}</div>`;
+}
+function fmtTs(d){ return d?new Date(d).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—'; }
+
+/* ── Stale data bar ── */
+function resetStaleTimer(){
+  clearTimeout(_staleTimer);
+  $('stale-bar').classList.remove('show');
+  if(S.isLive) _staleTimer=setTimeout(()=>$('stale-bar').classList.add('show'), STALE_MS);
+}
+function manualRefresh(){
+  $('fab').classList.add('spin');
+  loadAll().finally(()=>$('fab').classList.remove('spin'));
 }
 
-function tyreHTML(compound){
-  if(!compound) return '';
-  const map = {SOFT:'S',MEDIUM:'M',HARD:'H',INTERMEDIATE:'I',WET:'W'};
-  const cls = compound === 'INTERMEDIATE' ? 'inter' : compound.toLowerCase();
-  return `<div class="tyre ${cls}">${map[compound]||compound[0]}</div>`;
+/* ── Lap bar — always show once we have session data ── */
+function updateLapBar(){
+  $('lapbar').style.display='';
+  if(S.lapCount>0){
+    patchText($('lapnum'),`LAP ${S.lapCount}`);
+    patchText($('laptot'),S.totalLaps);
+    const pct=Math.min(100,(S.lapCount/S.totalLaps)*100).toFixed(1)+'%';
+    const fill=$('lpfill');
+    if(fill.style.width!==pct) fill.style.width=pct;
+  } else {
+    patchText($('lapnum'), S.session?.session_name||'SESSION');
+    patchText($('laptot'),'—');
+  }
 }
 
-/* ═══════════════════════════════════════════
-   SESSION DISCOVERY
-   Fetches Race+Sprint sessions for YEAR,
-   returns the one with the most recent date_start.
-   Results are cached — only re-fetches if the
-   session_key we stored differs from API result
-   (which happens once per weekend at most).
-═══════════════════════════════════════════ */
-let _sessFetchedAt = 0;
-const SESS_TTL = 5 * 60 * 1000; // re-check session every 5 min
+/* ═══ PULL-TO-REFRESH ═════════════════════ */
+(function(){
+  let startY=0,pulling=false,triggered=false;
+  const ptr=$('ptr');
+
+  document.addEventListener('touchstart',e=>{
+    if(window.scrollY>0) return;
+    startY=e.touches[0].clientY; pulling=true; triggered=false;
+  },{passive:true});
+
+  document.addEventListener('touchmove',e=>{
+    if(!pulling) return;
+    const dy=Math.max(0,e.touches[0].clientY-startY);
+    if(dy<6) return;
+    ptr.style.height=Math.min(dy*.4,50)+'px';
+    const ready=dy>=PTR_THRESH;
+    ptr.classList.toggle('ready',ready);
+    $('ptr-label').textContent=ready?'Release to refresh':'Pull to refresh';
+  },{passive:true});
+
+  document.addEventListener('touchend',()=>{
+    if(!pulling) return; pulling=false;
+    const wasReady=ptr.classList.contains('ready');
+    ptr.style.height='0'; ptr.classList.remove('ready');
+    $('ptr-label').textContent='Pull to refresh';
+    if(wasReady&&!triggered){ triggered=true; manualRefresh(); }
+  },{passive:true});
+})();
+
+/* ═══ SESSION DISCOVERY ═══════════════════ */
+let _sessFetchedAt=0;
+const SESS_TTL=5*60*1000;
 
 async function findSession(){
-  const now = Date.now();
-  /* Use cached session if fresh enough and not forced stale */
-  if(S.session && !S.sessStale && (now - _sessFetchedAt) < SESS_TTL){
-    return S.session;
-  }
-  S.sessStale = false;
-  _sessFetchedAt = now;
-
-  /* ── Strategy ────────────────────────────────────────────────────
-     OpenF1 exposes /sessions?session_key=latest which always returns
-     the single session that is currently live or most recently ended —
-     exactly what we need. We try that first (1 API call, fast).
-     If it returns a year we can cache as dataYear.
-     Fallback: fetch ALL sessions for current year (all session types),
-     pick the one with the most recent date_start that is <= now.
-     Walk back up to 2 years if the current year has no data yet.
-  ─────────────────────────────────────────────────────────────────── */
-
-  /* Step 1: try the /sessions?session_key=latest shortcut */
-  try {
-    const latest = await apiFetch('/sessions?session_key=latest');
-    if(Array.isArray(latest) && latest.length){
-      const sess = latest[0];
-      S.dataYear = sess.year || CURRENT_YEAR;
-
-      /* Fetch all sessions for this meeting so Weekend tab and
-         Next Session card always have data, regardless of which
-         code path found the current session. */
+  const now=Date.now();
+  if(S.session&&!S.sessStale&&(now-_sessFetchedAt)<SESS_TTL) return S.session;
+  S.sessStale=false; _sessFetchedAt=now;
+  try{
+    const latest=await apiFetch('/sessions?session_key=latest');
+    if(Array.isArray(latest)&&latest.length){
+      const sess=latest[0]; S.dataYear=sess.year||CURRENT_YEAR;
       if(sess.meeting_key){
-        const year = sess.year || S.dataYear || CURRENT_YEAR;
-        const allForYear = await apiFetch(`/sessions?year=${year}`).catch(()=>[]);
-        S.meetingSessions = allForYear
-          .filter(s => s.meeting_key === sess.meeting_key)
-          .sort((a,b) => new Date(a.date_start) - new Date(b.date_start));
+        const yr=sess.year||S.dataYear||CURRENT_YEAR;
+        const all=await apiFetch(`/sessions?year=${yr}`).catch(()=>[]);
+        S.meetingSessions=all.filter(s=>s.meeting_key===sess.meeting_key).sort((a,b)=>new Date(a.date_start)-new Date(b.date_start));
       }
-
       return sess;
     }
-  } catch(_){}
-
-  /* Step 2: fallback — fetch all sessions for the year, pick best match */
-  for(let year = CURRENT_YEAR; year >= CURRENT_YEAR - 2; year--){
-    /* Fetch ALL session types (Race, Sprint, Qualifying, Practice) in one call */
-    const all = await apiFetch(`/sessions?year=${year}`).catch(()=>[]);
+  }catch(_){}
+  for(let yr=CURRENT_YEAR;yr>=CURRENT_YEAR-2;yr--){
+    const all=await apiFetch(`/sessions?year=${yr}`).catch(()=>[]);
     if(!all.length) continue;
-
-    S.dataYear = year;
-    const nowMs = Date.now();
-
-    /* Sessions that have already started (date_start <= now) */
-    const started = all.filter(s => s.date_start && new Date(s.date_start).getTime() <= nowMs);
+    S.dataYear=yr;
+    const nowMs=Date.now();
+    const started=all.filter(s=>s.date_start&&new Date(s.date_start).getTime()<=nowMs);
     if(started.length){
-      /* Step 1: find the most recent meeting (highest meeting_key or latest date_start) */
-      const latestMk = started.reduce((max, s) =>
-        (s.meeting_key > max ? s.meeting_key : max), started[0].meeting_key);
-
-      /* Step 2: from that meeting, pick the session that started most recently.
-         Pure date_start desc — no type ranking, because ranking causes us to
-         skip back to e.g. the Sprint when Qualifying has already started. */
-      const latestMeeting = started.filter(s => s.meeting_key === latestMk);
-      latestMeeting.sort((a,b) => new Date(b.date_start) - new Date(a.date_start));
-
-      /* Store ALL sessions for this meeting for the Weekend view */
-      S.meetingSessions = all
-        .filter(s => s.meeting_key === latestMk)
-        .sort((a,b) => new Date(a.date_start) - new Date(b.date_start));
-
-      return latestMeeting[0];
+      const mk=started.reduce((m,s)=>s.meeting_key>m?s.meeting_key:m,started[0].meeting_key);
+      const latest=started.filter(s=>s.meeting_key===mk).sort((a,b)=>new Date(b.date_start)-new Date(a.date_start));
+      S.meetingSessions=all.filter(s=>s.meeting_key===mk).sort((a,b)=>new Date(a.date_start)-new Date(b.date_start));
+      return latest[0];
     }
-
-    /* Nothing started yet — return the next upcoming session */
-    all.sort((a,b) => new Date(a.date_start) - new Date(b.date_start));
-    /* Store sessions for next meeting */
-    const nextMk = all[0].meeting_key;
-    S.meetingSessions = all
-      .filter(s => s.meeting_key === nextMk)
-      .sort((a,b) => new Date(a.date_start) - new Date(b.date_start));
+    all.sort((a,b)=>new Date(a.date_start)-new Date(b.date_start));
+    const mk=all[0].meeting_key;
+    S.meetingSessions=all.filter(s=>s.meeting_key===mk).sort((a,b)=>new Date(a.date_start)-new Date(b.date_start));
     return all[0];
   }
   return null;
 }
 
-/* ═══════════════════════════════════════════
-   STANDINGS
-═══════════════════════════════════════════ */
+/* ═══ DNF DETECTION ═══════════════════════ */
+function detectRetirements(){
+  if(!S.isLive) return;
+  S.positions.forEach(p=>{
+    if(p.position===1) return;
+    const iv=S.intervals[p.driver_number];
+    // If interval record exists but both gap_to_leader and interval are null → retired/out
+    if(iv&&iv.gap_to_leader===null&&iv.interval===null) S.retiredDrivers.add(p.driver_number);
+  });
+  // Parse race control for explicit retirements
+  S.ctrlMsgs.forEach(m=>{
+    if(m.driver_number&&m.message&&/retir|mechanical|dnf|withdrew/i.test(m.message)){
+      S.retiredDrivers.add(m.driver_number);
+    }
+  });
+}
+
+/* ═══ STANDINGS ════════════════════════════ */
 function computeStandings(){
-  const drvPts = {};
-  S.positions.forEach(p => {
-    drvPts[p.driver_number] = (drvPts[p.driver_number]||0) + (PTS[p.position-1]||0);
-  });
-  /* Fastest lap bonus — only if driver finishes in points (P1–10) */
+  const drvPts={};
+  S.positions.forEach(p=>{ drvPts[p.driver_number]=(drvPts[p.driver_number]||0)+(PTS[p.position-1]||0); });
   if(S.fastestLap){
-    const fp = S.positions.find(p => p.driver_number === S.fastestLap.driver_number);
-    if(fp && fp.position <= 10) drvPts[fp.driver_number]++;
+    const fp=S.positions.find(p=>p.driver_number===S.fastestLap.driver_number);
+    if(fp&&fp.position<=10) drvPts[fp.driver_number]++;
   }
-  S.drvStd = Object.entries(drvPts)
-    .map(([dn,pts]) => ({dn:+dn, pts, d: S.drivers[+dn]||{}}))
-    .sort((a,b) => b.pts - a.pts);
-
-  const teamPts = {}, teamCol = {};
-  S.drvStd.forEach(({d,pts}) => {
-    const t = d.team_name||'—';
-    teamPts[t] = (teamPts[t]||0) + pts;
-    if(d.team_colour) teamCol[t] = '#'+d.team_colour;
-  });
-  S.teamStd = Object.entries(teamPts)
-    .map(([name,pts]) => ({name,pts,col:teamCol[name]||'#555'}))
-    .sort((a,b) => b.pts - a.pts);
+  S.drvStd=Object.entries(drvPts).map(([dn,pts])=>({dn:+dn,pts,d:S.drivers[+dn]||{}})).sort((a,b)=>b.pts-a.pts);
+  const teamPts={},teamCol={};
+  S.drvStd.forEach(({d,pts})=>{ const t=d.team_name||'—'; teamPts[t]=(teamPts[t]||0)+pts; if(d.team_colour) teamCol[t]='#'+d.team_colour; });
+  S.teamStd=Object.entries(teamPts).map(([name,pts])=>({name,pts,col:teamCol[name]||'#555'})).sort((a,b)=>b.pts-a.pts);
 }
 
-/* ═══════════════════════════════════════════
-   BOOT LOADER — runs once on page open
-   Bypasses all caches. Fetches every endpoint
-   sequentially, rendering each chunk as it
-   arrives so the user sees data immediately.
-   After completion, hands off to loadAll().
-═══════════════════════════════════════════ */
+/* ═══ BOOT LOADER ═════════════════════════ */
 async function bootLoad(){
-  // Mark session cache as stale so findSession() forces a fresh fetch
-  S.sessStale = true;
-  _sessFetchedAt = 0;
+  S.sessStale=true; _sessFetchedAt=0;
+  showBootProgress('Finding latest session…',0);
+  try{
+    const sess=await findSession();
+    if(!sess) return showNoData();
+    S.session=sess; S.sk=sess.session_key;
+    const live=isLiveSess(sess); setStatus(live); updateHeader(sess);
+    showBootProgress('Loading drivers…',14);
+    purgeSession(); S.skLoaded=S.sk;
+    const drArr=await apiFetch(`/drivers?session_key=${S.sk}`).catch(()=>[]);
+    S.drivers={}; drArr.forEach(d=>{ S.drivers[d.driver_number]=d; });
+    showBootProgress('Loading positions…',28);
 
-  // Show progress state
-  showBootProgress('Finding latest session…', 0);
-
-  try {
-    /* ── Step 1: Session discovery (always fresh) ──────── */
-    const sess = await findSession();
-    if(!sess){ return showNoData(); }
-    S.session = sess;
-    S.sk = sess.session_key;
-    const live = isLive(sess);
-    setStatus(live);
-    updateHeader(sess);
-    showBootProgress('Loading drivers…', 14);
-
-    /* ── Step 2: Drivers (force reload, purge previous session) ── */
-    purgeSession();
-    S.skLoaded = S.sk;
-    const drArr = await apiFetch(`/drivers?session_key=${S.sk}`).catch(()=>[]);
-    S.drivers = {};
-    drArr.forEach(d => { S.drivers[d.driver_number] = d; });
-    showBootProgress('Loading positions…', 28);
-
-    /* ── Step 3: Positions ─────────────────────────────── */
-    const posArr = await apiFetch(`/position?session_key=${S.sk}`).catch(()=>[]);
+    const posArr=await apiFetch(`/position?session_key=${S.sk}`).catch(()=>[]);
     if(posArr.length){
-      const lp = {};
-      posArr.forEach(p => {
-        if(!lp[p.driver_number] || p.date > lp[p.driver_number].date) lp[p.driver_number] = p;
-      });
-      S.positions = Object.values(lp).sort((a,b) => a.position - b.position);
+      const lp={}; posArr.forEach(p=>{ if(!lp[p.driver_number]||p.date>lp[p.driver_number].date) lp[p.driver_number]=p; });
+      S.positions=Object.values(lp).sort((a,b)=>a.position-b.position);
+      S.positions.forEach(p=>{ S.prevPositions[p.driver_number]=p.position; });
     }
-    // Render board with positions ASAP — user sees drivers immediately
-    computeStandings();
-    renderRaceBoard();
-    renderStandings();
-    renderSessionInfo(sess);
-    showBootProgress('Loading intervals…', 42);
+    computeStandings(); renderRaceBoard(); renderStandings(); renderSessionInfo(sess); updateLapBar();
+    showBootProgress('Loading intervals…',42);
 
-    /* ── Step 4: Intervals ─────────────────────────────── */
     if(live){
-      const intArr = await apiFetch(`/intervals?session_key=${S.sk}`).catch(()=>[]);
-      const li = {};
-      intArr.forEach(i => { if(!li[i.driver_number]||i.date>li[i.driver_number].date) li[i.driver_number]=i; });
-      S.intervals = li;
-    } else {
-      S.intervals = {};
+      const intArr=await apiFetch(`/intervals?session_key=${S.sk}`).catch(()=>[]);
+      const li={}; intArr.forEach(i=>{ if(!li[i.driver_number]||i.date>li[i.driver_number].date) li[i.driver_number]=i; }); S.intervals=li;
     }
-    showBootProgress('Loading tyres & stints…', 56);
+    showBootProgress('Loading stints…',56);
 
-    /* ── Step 5: Stints ────────────────────────────────── */
-    const stArr = await apiFetch(`/stints?session_key=${S.sk}`).catch(()=>[]);
-    if(stArr.length){
-      const ls = {};
-      stArr.forEach(s => {
-        if(!ls[s.driver_number]||s.stint_number>(ls[s.driver_number].stint_number||0)) ls[s.driver_number]=s;
-      });
-      S.stints = ls;
-    }
-    showBootProgress('Loading lap times…', 70);
-
-    /* ── Step 6: Laps ──────────────────────────────────── */
-    const lapArr = await apiFetch(`/laps?session_key=${S.sk}`).catch(()=>[]);
-    if(lapArr.length){
-      const ll = {};
-      lapArr.forEach(l => {
-        if(!ll[l.driver_number]||l.lap_number>(ll[l.driver_number].lap_number||0)) ll[l.driver_number]=l;
-      });
-      S.laps = ll;
-      const valid = lapArr.filter(l => +l.lap_duration > 0);
-      S.fastestLap = valid.length ? valid.reduce((a,b) => +a.lap_duration<+b.lap_duration?a:b) : null;
-      $('fltime').textContent = S.fastestLap ? fmtLap(S.fastestLap.lap_duration) : '—';
-      const maxLap = Object.values(ll).reduce((m,l) => Math.max(m, l.lap_number||0), 0);
-      S.lapCount = maxLap;
-      S.totalLaps = sess.total_laps || 58;
-      updateLapBar(maxLap);
-    }
-    showBootProgress('Loading weather…', 84);
-
-    /* ── Step 7: Weather ───────────────────────────────── */
-    const wxArr = await apiFetch(`/weather?session_key=${S.sk}`).catch(()=>[]);
-    S.weather = wxArr.length ? wxArr[wxArr.length-1] : null;
-    showBootProgress('Loading calendar…', 92);
-
-    /* ── Step 8: Schedule ──────────────────────────────── */
-    if(!_schedDone){ _schedDone = true; loadSchedule(); }
-
-    /* ── Final: full render with all data ──────────────── */
-    computeStandings();
-    renderRaceBoard();
-    renderStandings();
-    renderSessionInfo(sess);
-    renderTimings();
-    renderWeather();
-    S.lastUpdated = new Date();
-    showBootProgress('Ready', 100);
-
-    // Small delay so user sees 100% before it disappears
-    await new Promise(r => setTimeout(r, 300));
-    hideBootProgress();
-
-    /* Hand off to normal polling */
-    setTick(live ? TICK_LIVE : TICK_IDLE);
-
-  } catch(err){
-    console.error('[bootLoad]', err);
-    hideBootProgress();
-    $('lb-race-wrap').innerHTML = `<div class="smsg"><div class="ico">⚠️</div>
-      <h3>Connection Error</h3>
-      <p style="font-size:11px;max-width:320px;margin:0 auto;word-break:break-word">${err.message}</p>
-      <p style="margin-top:8px;font-size:11px">Tap ↻ to retry</p></div>`;
-    setStatus(false);
-  }
-}
-
-/* Boot progress overlay helpers */
-function showBootProgress(label, pct){
-  let el = $('boot-progress');
-  if(!el){
-    el = document.createElement('div');
-    el.id = 'boot-progress';
-    el.style.cssText = `position:fixed;top:0;left:0;right:0;z-index:999;
-      background:var(--surface);border-bottom:1px solid var(--border);
-      padding:10px 16px;display:flex;align-items:center;gap:12px;`;
-    el.innerHTML = `
-      <div style="flex:1">
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;
-          letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px"
-          id="boot-label">Initialising…</div>
-        <div style="height:3px;background:var(--border);border-radius:2px;overflow:hidden">
-          <div id="boot-bar" style="height:100%;background:var(--red);border-radius:2px;
-            width:0%;transition:width 0.4s ease"></div>
-        </div>
-      </div>
-      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;
-        color:var(--red);width:36px;text-align:right" id="boot-pct">0%</div>`;
-    document.body.prepend(el);
-  }
-  $('boot-label').textContent = label;
-  $('boot-bar').style.width = pct + '%';
-  $('boot-pct').textContent = pct + '%';
-}
-
-function hideBootProgress(){
-  const el = $('boot-progress');
-  if(el){
-    el.style.transition = 'opacity 0.3s ease';
-    el.style.opacity = '0';
-    setTimeout(() => el.remove(), 320);
-  }
-}
-
-/* ═══════════════════════════════════════════
-   MAIN LOADER — normal polling after boot
-   Session + drivers cached; only fetches
-   what has changed since last tick.
-═══════════════════════════════════════════ */
-async function loadAll(){
-  S.tickN++;
-  const slowTick = (S.tickN % SLOW_EVERY === 0); // true every Nth tick for slow endpoints
-  try {
-    /* ── 1. Session (TTL-cached, ~1 call per 5 min) ──────── */
-    const sess = await findSession();
-    if(!sess){ return showNoData(); }
-    S.session = sess;
-    S.sk = sess.session_key;
-    const live = isLive(sess);
-    setStatus(live);
-    updateHeader(sess);
-
-    /* ── 2. Drivers (once per session_key) ───────────────── */
-    if(S.skLoaded !== S.sk){
-      /* Session changed — purge everything from the previous session */
-      purgeSession();
-      S.skLoaded = S.sk;
-      const drArr = await apiFetch(`/drivers?session_key=${S.sk}`).catch(()=>[]);
-      S.drivers = {};
-      drArr.forEach(d => { S.drivers[d.driver_number] = d; });
-    }
-
-    /* ── 3. Positions — every tick (fast-changing) ────────── */
-    const posArr = await apiFetch(`/position?session_key=${S.sk}`).catch(()=>[]);
-    if(posArr.length){
-      const lp = {};
-      posArr.forEach(p => {
-        if(!lp[p.driver_number] || p.date > lp[p.driver_number].date) lp[p.driver_number] = p;
-      });
-      S.positions = Object.values(lp).sort((a,b) => a.position - b.position);
-    }
-
-    /* ── 4. Intervals — every tick when live (fast-changing) ─ */
     if(live){
-      const intArr = await apiFetch(`/intervals?session_key=${S.sk}`).catch(()=>[]);
-      const li = {};
-      intArr.forEach(i => { if(!li[i.driver_number]||i.date>li[i.driver_number].date) li[i.driver_number]=i; });
-      S.intervals = li;
-    } else {
-      S.intervals = {};
+      const stArr=await apiFetch(`/stints?session_key=${S.sk}`).catch(()=>[]);
+      if(stArr.length){ const ls={}; stArr.forEach(s=>{ if(!ls[s.driver_number]||s.stint_number>(ls[s.driver_number].stint_number||0)) ls[s.driver_number]=s; }); S.stints=ls; }
     }
+    showBootProgress('Loading laps…',70);
 
-    /* ── 5. Laps — every tick (lap times update each lap) ──── */
-    const lapArr = await apiFetch(`/laps?session_key=${S.sk}`).catch(()=>[]);
-    if(lapArr.length){
-      const ll = {};
-      lapArr.forEach(l => {
-        if(!ll[l.driver_number]||l.lap_number>(ll[l.driver_number].lap_number||0)) ll[l.driver_number]=l;
-      });
-      S.laps = ll;
-      const valid = lapArr.filter(l => +l.lap_duration > 0);
-      S.fastestLap = valid.length ? valid.reduce((a,b) => +a.lap_duration<+b.lap_duration?a:b) : null;
-      $('fltime').textContent = S.fastestLap ? fmtLap(S.fastestLap.lap_duration) : '—';
-      const maxLap = Object.values(ll).reduce((m,l) => Math.max(m, l.lap_number||0), 0);
-      S.lapCount = maxLap;
-      S.totalLaps = sess.total_laps || 58;
-      updateLapBar(maxLap);
-    }
-
-    /* ── 6. Stints — slow tick only (pit stops are rare) ───── */
-    if(slowTick || !Object.keys(S.stints).length){
-      const stArr = await apiFetch(`/stints?session_key=${S.sk}`).catch(()=>[]);
-      if(stArr.length){
-        const ls = {};
-        stArr.forEach(s => {
-          if(!ls[s.driver_number]||s.stint_number>(ls[s.driver_number].stint_number||0)) ls[s.driver_number]=s;
-        });
-        S.stints = ls;
+    if(live){
+      const lapArr=await apiFetch(`/laps?session_key=${S.sk}`).catch(()=>[]);
+      if(lapArr.length){
+        const ll={}; lapArr.forEach(l=>{ if(!ll[l.driver_number]||l.lap_number>(ll[l.driver_number].lap_number||0)) ll[l.driver_number]=l; }); S.laps=ll;
+        const valid=lapArr.filter(l=>+l.lap_duration>0);
+        S.fastestLap=valid.length?valid.reduce((a,b)=>+a.lap_duration<+b.lap_duration?a:b):null;
+        $('fltime').textContent=S.fastestLap?fmtLap(S.fastestLap.lap_duration):'—';
+        S.lapCount=Object.values(ll).reduce((m,l)=>Math.max(m,l.lap_number||0),0);
+        S.totalLaps=sess.total_laps||58;
       }
     }
+    updateLapBar();
+    showBootProgress('Loading weather…',84);
 
-    /* ── 7. Weather — slow tick only (changes ~every 30s) ──── */
-    if(slowTick || !S.weather){
-      const wxArr = await apiFetch(`/weather?session_key=${S.sk}`).catch(()=>[]);
-      S.weather = wxArr.length ? wxArr[wxArr.length-1] : null;
-    }
+    if(live){ const wxArr=await apiFetch(`/weather?session_key=${S.sk}`).catch(()=>[]); S.weather=wxArr.length?wxArr[wxArr.length-1]:null; }
+    showBootProgress('Loading calendar…',92);
+    if(!_schedDone){ _schedDone=true; loadSchedule(); }
 
-    /* ── 8. Live feed — on slow tick, or first time for this session ── */
-    if(slowTick || !_liveDone){
-      _liveDone = true;
-      fetchLiveFeed(); // fire-and-forget, renders independently
-    }
-
-    /* ── 9. Compute & render ─────────────────────────────── */
-    computeStandings();
-    renderRaceBoard();
-    renderStandings();
-    renderSessionInfo(sess);
-    renderTimings();
-    renderWeather();
-    S.lastUpdated = new Date();
-
-    /* ── 10. Schedule (fire-and-forget, once) ────────────── */
-    if(!_schedDone){ _schedDone = true; loadSchedule(); }
-
-    /* ── 11. Tick rate ──────────────────────────────────── */
-    setTick(live ? TICK_LIVE : TICK_IDLE);
-
-  } catch(err){
-    console.error('[loadAll]', err);
-    $('lb-race-wrap').innerHTML = `<div class="smsg"><div class="ico">⚠️</div>
-      <h3>Connection Error</h3>
-      <p style="font-size:11px;max-width:320px;margin:0 auto;word-break:break-word">${err.message}</p>
-      <p style="margin-top:8px;font-size:11px">Tap ↻ to retry</p></div>`;
+    detectRetirements(); computeStandings();
+    renderRaceBoard(); renderStandings(); renderSessionInfo(sess);
+    renderTimings(); renderWeather(); renderPositionChanges();
+    S.lastUpdated=new Date(); resetStaleTimer();
+    showBootProgress('Ready',100);
+    await new Promise(r=>setTimeout(r,300));
+    hideBootProgress();
+    setTick(live?TICK_LIVE:TICK_IDLE);
+  }catch(err){
+    console.error('[boot]',err); hideBootProgress();
+    $('lb-race-wrap').innerHTML=`<div class="smsg"><div class="ico">⚠️</div><h3>Connection Error</h3><p style="font-size:11px;max-width:320px;margin:0 auto;word-break:break-word">${err.message}</p><p style="margin-top:8px;font-size:11px">Tap ↻ to retry</p></div>`;
     setStatus(false);
   }
 }
 
-/* ═══════════════════════════════════════════
-   RENDER HELPERS
-═══════════════════════════════════════════ */
-function updateHeader(s){
-  $('rname').textContent    = s.meeting_name || s.circuit_short_name || 'F1 Session';
-  $('rcircuit').textContent = s.circuit_short_name || s.location || '—';
-  $('rdate').textContent    = s.date_start
-    ? new Date(s.date_start).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—';
-}
-
-function updateLapBar(lap){
-  if(!lap || lap < 1) return;
-  $('lapbar').style.display = '';
-  $('lapnum').textContent   = `LAP ${lap}`;
-  $('laptot').textContent   = S.totalLaps;
-  $('lpfill').style.width   = Math.min(100, (lap/S.totalLaps)*100) + '%';
-}
-
-/* ── Race Board ── */
-function renderRaceBoard(){
-  const wrap = $('lb-race-wrap');
-  if(!S.positions.length){
-    wrap.innerHTML = `<div class="smsg"><div class="ico">🏁</div><h3>No position data</h3>
-      <p>Race hasn't started, or data isn't available yet.</p></div>`;
-    return;
+function showBootProgress(label,pct){
+  let el=$('boot-progress');
+  if(!el){
+    el=document.createElement('div'); el.id='boot-progress';
+    el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:999;background:var(--surface);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:12px;';
+    el.innerHTML=`<div style="flex:1"><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px" id="boot-label">Initialising…</div><div style="height:3px;background:var(--border);border-radius:2px;overflow:hidden"><div id="boot-bar" style="height:100%;background:var(--red);border-radius:2px;width:0%;transition:width 0.4s ease"></div></div></div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:var(--red);width:36px;text-align:right" id="boot-pct">0%</div>`;
+    document.body.prepend(el);
   }
-  const sname = S.session?.session_name || 'Session';
-  const mname = S.session?.meeting_name || '';
-  let html = S.isLive
-    ? `<div class="status-bar"><span style="color:var(--green)">● LIVE</span><span>${sname} · ${mname}</span></div>`
-    : `<div class="result-banner"><b>🏁 LAST RESULT — ${sname.toUpperCase()}</b><span>${mname}</span></div>`;
+  $('boot-label').textContent=label; $('boot-bar').style.width=pct+'%'; $('boot-pct').textContent=pct+'%';
+}
+function hideBootProgress(){
+  const el=$('boot-progress');
+  if(el){ el.style.transition='opacity 0.3s ease'; el.style.opacity='0'; setTimeout(()=>el.remove(),320); }
+}
 
-  html += '<div class="dlist">';
-  S.positions.forEach(p => {
-    const dr    = S.drivers[p.driver_number] || {};
-    const lap   = S.laps[p.driver_number];
-    const st    = S.stints[p.driver_number];
-    const iv    = S.intervals[p.driver_number];
-    const pos   = p.position;
-    const isFl  = S.fastestLap?.driver_number === p.driver_number;
-    const cls   = pos===1?'p1':pos===2?'p2':pos===3?'p3':isFl?'fl':'';
-    const col   = dr.team_colour ? '#'+dr.team_colour : '#555';
-    const inPit = st?.pit_in_time && !st?.pit_out_time;
+/* ═══ MAIN LOADER ═════════════════════════ */
+async function loadAll(){
+  S.tickN++;
+  const slowTick=(S.tickN%SLOW_EVERY===0);
+  try{
+    const sess=await findSession(); if(!sess) return showNoData();
+    S.session=sess; S.sk=sess.session_key;
+    const live=isLiveSess(sess); setStatus(live); updateHeader(sess);
 
-    let gapHTML;
-    if(pos === 1){
-      gapHTML = `<span class="gap ldr">⬤ LEADER</span>`;
-    } else if(iv?.gap_to_leader != null){
-      const g = iv.gap_to_leader;
-      gapHTML = `<span class="gap">${typeof g==='string'?g:'+'+Number(g).toFixed(3)+'s'}</span>`;
-    } else {
-      gapHTML = `<span class="gap" style="color:var(--muted)">—</span>`;
+    if(S.skLoaded!==S.sk){
+      purgeSession(); S.skLoaded=S.sk;
+      const drArr=await apiFetch(`/drivers?session_key=${S.sk}`).catch(()=>[]);
+      S.drivers={}; drArr.forEach(d=>{ S.drivers[d.driver_number]=d; });
     }
 
-    const lapHTML = lap?.lap_duration
-      ? `<span class="llap${isFl?' fl':''}">⏱ ${fmtLap(lap.lap_duration)}${isFl?' 🟣':''}</span>` : '';
+    // Positions
+    const posArr=await apiFetch(`/position?session_key=${S.sk}`).catch(()=>[]);
+    if(posArr.length){
+      const lp={}; posArr.forEach(p=>{ if(!lp[p.driver_number]||p.date>lp[p.driver_number].date) lp[p.driver_number]=p; });
+      const newPos=Object.values(lp).sort((a,b)=>a.position-b.position);
+      if(live&&Object.keys(S.prevPositions).length){
+        newPos.forEach(p=>{
+          const prev=S.prevPositions[p.driver_number];
+          if(prev!=null&&prev!==p.position){
+            S.posChanges=[{driver_number:p.driver_number,from:prev,to:p.position,
+              ts:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'})
+            },...S.posChanges].slice(0,20);
+          }
+        });
+      }
+      if(live) newPos.forEach(p=>{ S.prevPositions[p.driver_number]=p.position; });
+      S.positions=newPos;
+    }
 
-    html += `<div class="dcard ${cls}">
-      <div class="posn">${pos}</div>
-      <div class="tcbar" style="background:${col}"></div>
-      <div class="dinfo">
-        <div class="dname">${dr.full_name||'Driver #'+p.driver_number}</div>
-        <div class="dteam" style="color:${col}">${dr.team_name||'—'}</div>
-        <div class="dextra">${tyreHTML(st?.compound)}${inPit?'<span class="pit-badge">PIT</span>':''}</div>
-      </div>
-      <div class="dright">${gapHTML}${lapHTML}</div>
-    </div>`;
-  });
-  html += '</div>';
-  wrap.innerHTML = html;
+    // Intervals — live only
+    if(live){
+      const intArr=await apiFetch(`/intervals?session_key=${S.sk}`).catch(()=>[]);
+      const li={}; intArr.forEach(i=>{ if(!li[i.driver_number]||i.date>li[i.driver_number].date) li[i.driver_number]=i; }); S.intervals=li;
+    } else S.intervals={};
+
+    // Laps — live only
+    if(live){
+      const lapArr=await apiFetch(`/laps?session_key=${S.sk}`).catch(()=>[]);
+      if(lapArr.length){
+        const ll={}; lapArr.forEach(l=>{ if(!ll[l.driver_number]||l.lap_number>(ll[l.driver_number].lap_number||0)) ll[l.driver_number]=l; }); S.laps=ll;
+        const valid=lapArr.filter(l=>+l.lap_duration>0);
+        S.fastestLap=valid.length?valid.reduce((a,b)=>+a.lap_duration<+b.lap_duration?a:b):null;
+        $('fltime').textContent=S.fastestLap?fmtLap(S.fastestLap.lap_duration):'—';
+        S.lapCount=Object.values(ll).reduce((m,l)=>Math.max(m,l.lap_number||0),0);
+        S.totalLaps=sess.total_laps||58;
+      }
+    }
+    updateLapBar();
+
+    // Stints — live + slow tick only
+    if(live&&(slowTick||!Object.keys(S.stints).length)){
+      const stArr=await apiFetch(`/stints?session_key=${S.sk}`).catch(()=>[]);
+      if(stArr.length){ const ls={}; stArr.forEach(s=>{ if(!ls[s.driver_number]||s.stint_number>(ls[s.driver_number].stint_number||0)) ls[s.driver_number]=s; }); S.stints=ls; }
+    }
+
+    // Weather — live + slow tick only
+    if(live&&(slowTick||!S.weather)){
+      const wxArr=await apiFetch(`/weather?session_key=${S.sk}`).catch(()=>[]); S.weather=wxArr.length?wxArr[wxArr.length-1]:null;
+    }
+
+    // Live feed — live + slow tick only
+    if(live&&(slowTick||!_liveDone)){ _liveDone=true; fetchLiveFeed(); }
+
+    detectRetirements(); computeStandings();
+    renderRaceBoard(); renderStandings(); renderSessionInfo(sess);
+    renderTimings(); renderWeather(); renderPositionChanges();
+    S.lastUpdated=new Date(); resetStaleTimer();
+
+    if(!_schedDone){ _schedDone=true; loadSchedule(); }
+    setTick(live?TICK_LIVE:TICK_IDLE);
+  }catch(err){
+    console.error('[loadAll]',err);
+    $('lb-race-wrap').innerHTML=`<div class="smsg"><div class="ico">⚠️</div><h3>Connection Error</h3><p style="font-size:11px;max-width:320px;margin:0 auto;word-break:break-word">${err.message}</p><p style="margin-top:8px;font-size:11px">Tap ↻ to retry</p></div>`;
+    setStatus(false);
+  }
 }
 
-/* ── Driver & Team Standings ── */
+/* ═══ RENDER ══════════════════════════════ */
+function updateHeader(s){
+  patchText($('rname'), s.meeting_name||s.circuit_short_name||'F1 Session');
+  patchText($('rcircuit'), s.circuit_short_name||s.location||'—');
+  patchText($('rdate'), s.date_start?new Date(s.date_start).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'—');
+}
+
+/* Race Board — DOM diffing to prevent full re-render flicker every 12s */
+function renderRaceBoard(){
+  const wrap=$('lb-race-wrap');
+  if(!S.positions.length){
+    wrap.innerHTML=`<div class="smsg"><div class="ico">🏁</div><h3>No position data</h3><p>Race hasn't started, or data isn't available yet.</p></div>`;
+    return;
+  }
+  const sname=S.session?.session_name||'Session', mname=S.session?.meeting_name||'';
+
+  // Patch or create banner
+  let banner=wrap.querySelector('[data-banner]');
+  const bannerKey=S.isLive?'live':'result';
+  if(!banner||banner.dataset.banner!==bannerKey){
+    const bh=S.isLive
+      ?`<div class="status-bar" data-banner="live"><span style="color:var(--green)">● LIVE</span><span>${sname} · ${mname}</span></div>`
+      :`<div class="result-banner" data-banner="result"><b>🏁 LAST RESULT — ${sname.toUpperCase()}</b><span>${mname}</span></div>`;
+    if(banner) banner.outerHTML=bh; else wrap.insertAdjacentHTML('afterbegin',bh);
+  }
+
+  // Ensure dlist exists
+  let list=wrap.querySelector('.dlist');
+  if(!list){ list=document.createElement('div'); list.className='dlist'; wrap.appendChild(list); }
+
+  // Index existing cards by driver_number
+  const existing={};
+  list.querySelectorAll('[data-dn]').forEach(c=>{ existing[c.dataset.dn]=c; });
+
+  const ordered=[];
+  S.positions.forEach(p=>{
+    const dr=S.drivers[p.driver_number]||{}, lap=S.laps[p.driver_number];
+    const st=S.stints[p.driver_number], iv=S.intervals[p.driver_number];
+    const pos=p.position, isFl=S.fastestLap?.driver_number===p.driver_number;
+    const isRetired=S.retiredDrivers.has(p.driver_number);
+    const cls=pos===1?'p1':pos===2?'p2':pos===3?'p3':isFl?'fl':'';
+    const col=dr.team_colour?'#'+dr.team_colour:'#555';
+    const inPit=st?.pit_in_time&&!st?.pit_out_time;
+    const dn=String(p.driver_number);
+
+    let gapHTML;
+    if(pos===1) gapHTML='<span class="gap ldr">⬤ LEADER</span>';
+    else if(iv?.gap_to_leader!=null){ const g=iv.gap_to_leader; gapHTML=`<span class="gap">${typeof g==='string'?g:'+'+Number(g).toFixed(3)+'s'}</span>`; }
+    else gapHTML='<span class="gap" style="color:var(--muted)">—</span>';
+
+    const lapHTML=lap?.lap_duration?`<span class="llap${isFl?' fl':''}">⏱ ${fmtLap(lap.lap_duration)}${isFl?' 🟣':''}</span>`:'';
+    const extrasHTML=[tyreHTML(st?.compound),inPit?'<span class="pit-badge">PIT</span>':'',isRetired?'<span class="dnf-badge">DNF</span>':''].join('');
+    const fullCls=`dcard ${cls}${isRetired?' dnf':''}`;
+
+    let card=existing[dn];
+    if(!card){
+      card=document.createElement('div');
+      card.className=fullCls; card.dataset.dn=dn;
+      card.innerHTML=`<div class="posn" data-f="posn">${pos}</div><div class="tcbar" style="background:${col}"></div><div class="dinfo"><div class="dname">${dr.full_name||'Driver #'+p.driver_number}</div><div class="dteam" style="color:${col}">${dr.team_name||'—'}</div><div class="dextra" data-f="extras">${extrasHTML}</div></div><div class="dright" data-f="right">${gapHTML}${lapHTML}</div>`;
+    } else {
+      if(card.className!==fullCls) card.className=fullCls;
+      const pe=card.querySelector('[data-f="posn"]'); if(pe&&pe.textContent!==String(pos)) pe.textContent=pos;
+      const re=card.querySelector('[data-f="right"]'); const rn=gapHTML+lapHTML; if(re&&re.innerHTML!==rn) re.innerHTML=rn;
+      const ee=card.querySelector('[data-f="extras"]'); if(ee&&ee.innerHTML!==extrasHTML) ee.innerHTML=extrasHTML;
+    }
+    ordered.push(card); delete existing[dn];
+  });
+
+  // Remove stale cards
+  Object.values(existing).forEach(c=>c.remove());
+  // Re-order without rebuilding
+  ordered.forEach((c,i)=>{ if(list.children[i]!==c) list.appendChild(c); });
+}
+
 function renderStandings(){
   if(!S.drvStd.length){
     $('lb-drv-wrap').innerHTML='<div class="smsg"><div class="ico">👤</div><h3>No standings yet</h3></div>';
     $('lb-team-wrap').innerHTML='<div class="smsg"><div class="ico">🏭</div><h3>No standings yet</h3></div>';
     return;
   }
-  const maxD = S.drvStd[0]?.pts || 1;
-  let dh = `<div class="standings-wrap"><table class="st-table">
-    <thead><tr><th>Pos</th><th></th><th>Driver</th><th>Team</th><th class="r">Pts</th></tr></thead><tbody>`;
-  S.drvStd.forEach(({dn,pts,d},i) => {
-    const pos  = i+1;
-    const pcls = pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
-    const col  = d.team_colour ? '#'+d.team_colour : '#555';
-    dh += `<tr>
-      <td class="st-pos ${pcls}">${pos}</td>
-      <td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td>
-      <td>
-        <div class="st-name">${d.full_name||'#'+dn}</div>
-        <div class="st-sub">${d.name_acronym||''}</div>
-        <div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxD*100)}%;background:${col}"></div></div>
-      </td>
-      <td><div class="st-sub" style="color:${col}">${d.team_name||'—'}</div></td>
-      <td class="r st-pts">${pts}</td>
-    </tr>`;
+  const maxD=S.drvStd[0]?.pts||1;
+  let dh=`<div class="standings-wrap"><table class="st-table"><thead><tr><th>Pos</th><th></th><th>Driver</th><th>Team</th><th class="r">Pts</th></tr></thead><tbody>`;
+  S.drvStd.forEach(({dn,pts,d},i)=>{
+    const pos=i+1,pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'',col=d.team_colour?'#'+d.team_colour:'#555';
+    dh+=`<tr><td class="st-pos ${pcls}">${pos}</td><td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td><td><div class="st-name">${d.full_name||'#'+dn}</div><div class="st-sub">${d.name_acronym||''}</div><div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxD*100)}%;background:${col}"></div></div></td><td><div class="st-sub" style="color:${col}">${d.team_name||'—'}</div></td><td class="r st-pts">${pts}</td></tr>`;
   });
-  dh += `</tbody></table><div class="st-note">Session points only · FL bonus applied where eligible</div></div>`;
-  $('lb-drv-wrap').innerHTML = dh;
-
-  const maxT = S.teamStd[0]?.pts || 1;
-  let th = `<div class="standings-wrap"><table class="st-table">
-    <thead><tr><th>Pos</th><th></th><th>Constructor</th><th class="r">Pts</th></tr></thead><tbody>`;
-  S.teamStd.forEach(({name,pts,col},i) => {
-    const pos  = i+1;
-    const pcls = pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
-    th += `<tr>
-      <td class="st-pos ${pcls}">${pos}</td>
-      <td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td>
-      <td>
-        <div class="st-name">${name}</div>
-        <div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxT*100)}%;background:${col}"></div></div>
-      </td>
-      <td class="r st-pts">${pts}</td>
-    </tr>`;
+  dh+=`</tbody></table><div class="st-note">Session points only · FL bonus applied where eligible</div></div>`;
+  $('lb-drv-wrap').innerHTML=dh;
+  const maxT=S.teamStd[0]?.pts||1;
+  let th=`<div class="standings-wrap"><table class="st-table"><thead><tr><th>Pos</th><th></th><th>Constructor</th><th class="r">Pts</th></tr></thead><tbody>`;
+  S.teamStd.forEach(({name,pts,col},i)=>{
+    const pos=i+1,pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
+    th+=`<tr><td class="st-pos ${pcls}">${pos}</td><td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td><td><div class="st-name">${name}</div><div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxT*100)}%;background:${col}"></div></div></td><td class="r st-pts">${pts}</td></tr>`;
   });
-  th += `</tbody></table><div class="st-note">Constructor points from this session</div></div>`;
-  $('lb-team-wrap').innerHTML = th;
+  th+=`</tbody></table><div class="st-note">Constructor points from this session</div></div>`;
+  $('lb-team-wrap').innerHTML=th;
 }
 
-/* ── Session Info ── */
+function renderPositionChanges(){
+  const wrap=$('sx-poschanges-wrap'); if(!wrap) return;
+  if(!S.isLive||!S.posChanges.length){
+    wrap.innerHTML=S.isLive?`<div class="pc-wrap"><div class="pc-block"><div class="pc-hdr">🔄 Position Changes</div><div class="pc-none">No changes detected yet this session</div></div></div>`:'';
+    return;
+  }
+  let rows='';
+  S.posChanges.forEach(c=>{
+    const dr=S.drivers[c.driver_number]||{},col=dr.team_colour?'#'+dr.team_colour:'#555';
+    const gained=c.to<c.from,delta=Math.abs(c.from-c.to),dir=gained?'up':'dn';
+    rows+=`<div class="pc-row"><div class="pc-left"><div class="pc-badge ${dir}">${gained?'▲':'▼'}${delta}</div><div><div class="pc-name" style="color:${col}">${dr.name_acronym||dr.full_name||'#'+c.driver_number}</div><div class="pc-team">${dr.team_name||'—'}</div></div></div><div class="pc-arrow ${dir}">P${c.from} → P${c.to}<span style="font-size:10px;color:var(--muted);font-family:'Barlow',sans-serif;font-weight:400;margin-left:4px">${c.ts}</span></div></div>`;
+  });
+  wrap.innerHTML=`<div class="pc-wrap"><div class="pc-block"><div class="pc-hdr">🔄 Position Changes <span class="lf-count">${S.posChanges.length}</span><span class="pc-ts">Latest: ${S.posChanges[0].ts}</span></div><div class="pc-list">${rows}</div></div></div>`;
+}
+
 function renderSessionInfo(s){
-  const live = isLive(s);
-  const ds   = s.date_start
-    ? new Date(s.date_start).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : '—';
-
-  /* Find next session in this weekend */
-  const nowMs = Date.now();
-  const upcoming = S.meetingSessions.filter(ms =>
-    ms.session_key !== s.session_key &&
-    new Date(ms.date_start).getTime() > nowMs
-  );
-  const nextSess = upcoming[0] || null;
-
-  let nextHTML = '';
+  const live=isLiveSess(s);
+  const ds=s.date_start?new Date(s.date_start).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'—';
+  const nowMs=Date.now();
+  const upcoming=S.meetingSessions.filter(ms=>ms.session_key!==s.session_key&&new Date(ms.date_start).getTime()>nowMs);
+  const nextSess=upcoming[0]||null;
+  let nextHTML='';
   if(nextSess){
-    const nextStart  = new Date(nextSess.date_start);
-    const diffMs     = nextStart.getTime() - nowMs;
-    const diffH      = Math.floor(diffMs / 3600000);
-    const diffM      = Math.floor((diffMs % 3600000) / 60000);
-    const countdown  = diffH > 0 ? `${diffH}h ${diffM}m` : `${diffM}m`;
-    const nextDateFmt= nextStart.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
-    const nextTimeFmt= nextStart.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-    nextHTML = `
-    <div style="padding:0 12px 10px"><div class="icard" style="border-color:var(--red);background:rgba(225,6,0,.04)">
-      <div class="ilbl" style="color:var(--red)">▶ Next Session</div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
-        <div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px">${nextSess.session_name}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px">${nextDateFmt} · ${nextTimeFmt} local</div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;color:var(--red)">${countdown}</div>
-          <div style="font-size:10px;color:var(--muted)">away</div>
-        </div>
-      </div>
-    </div></div>`;
+    const ns=new Date(nextSess.date_start),diff=ns.getTime()-nowMs;
+    const h=Math.floor(diff/3600000),m=Math.floor((diff%3600000)/60000);
+    const countdown=h>0?`${h}h ${m}m`:`${m}m`;
+    nextHTML=`<div style="padding:0 12px 10px"><div class="icard" style="border-color:var(--red);background:rgba(225,6,0,.04)"><div class="ilbl" style="color:var(--red)">▶ Next Session</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px">${nextSess.session_name}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${ns.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})} · ${ns.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})} local</div></div><div style="text-align:right"><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;color:var(--red)">${countdown}</div><div style="font-size:10px;color:var(--muted)">away</div></div></div></div></div>`;
   }
-
-  $('sx-info-wrap').innerHTML = `
-    ${nextHTML}
-    <div class="igrid">
-      <div class="icard"><div class="ilbl">Session</div><div class="ival" style="font-size:16px">${s.session_name||'—'}</div></div>
-      <div class="icard"><div class="ilbl">Status</div><div class="ival ${live?'green':''}">${live?'LIVE':'FINISHED'}</div></div>
-      <div class="icard"><div class="ilbl">Circuit</div><div class="ival" style="font-size:15px">${s.circuit_short_name||'—'}</div></div>
-      <div class="icard"><div class="ilbl">Country</div><div class="ival" style="font-size:15px">${s.country_name||'—'}</div></div>
-      <div class="icard"><div class="ilbl">Lap</div><div class="ival red">${S.lapCount||'—'}<span style="font-size:13px;color:var(--muted)"> / ${S.totalLaps}</span></div></div>
-      <div class="icard"><div class="ilbl">Fastest Lap</div><div class="ival purple" style="font-size:14px">${fmtLap(S.fastestLap?.lap_duration)}</div></div>
-    </div>
-    <div style="padding:0 12px 10px"><div class="icard">
-      <div class="ilbl">Date</div><div style="font-size:13px;margin-top:4px">${ds}</div>
-    </div></div>
-    <div style="padding:0 12px 10px"><div class="icard">
-      <div class="ilbl">Last Updated</div>
-      <div style="font-size:12px;margin-top:4px;color:var(--muted)">${S.lastUpdated?S.lastUpdated.toLocaleTimeString():'—'}</div>
-    </div></div>`;
-
-  renderWeekend();
+  $('sx-info-wrap').innerHTML=`${nextHTML}<div id="sx-poschanges-wrap"></div><div class="igrid"><div class="icard"><div class="ilbl">Session</div><div class="ival" style="font-size:16px">${s.session_name||'—'}</div></div><div class="icard"><div class="ilbl">Status</div><div class="ival ${live?'green':''}">${live?'LIVE':'FINISHED'}</div></div><div class="icard"><div class="ilbl">Circuit</div><div class="ival" style="font-size:15px">${s.circuit_short_name||'—'}</div></div><div class="icard"><div class="ilbl">Country</div><div class="ival" style="font-size:15px">${s.country_name||'—'}</div></div><div class="icard"><div class="ilbl">Lap</div><div class="ival red">${S.lapCount||'—'}<span style="font-size:13px;color:var(--muted)"> / ${S.totalLaps}</span></div></div><div class="icard"><div class="ilbl">Fastest Lap</div><div class="ival purple" style="font-size:14px">${fmtLap(S.fastestLap?.lap_duration)}</div></div></div><div style="padding:0 12px 10px"><div class="icard"><div class="ilbl">Date</div><div style="font-size:13px;margin-top:4px">${ds}</div></div></div><div style="padding:0 12px 10px"><div class="icard"><div class="ilbl">Last Updated</div><div style="font-size:12px;margin-top:4px;color:var(--muted)">${S.lastUpdated?S.lastUpdated.toLocaleTimeString():'—'}</div></div></div>`;
+  renderWeekend(); renderPositionChanges();
 }
 
-/* ── Weekend Schedule ── */
 function renderWeekend(){
-  const wrap = $('sx-weekend-wrap');
-  if(!wrap) return;
-  if(!S.meetingSessions.length){
-    wrap.innerHTML = '<div class="smsg"><div class="ico">📆</div><h3>No weekend data</h3></div>';
-    return;
-  }
-  const nowMs   = Date.now();
-  const meeting = S.session?.meeting_name || 'Race Weekend';
-
-  let html = `<div style="padding:10px 12px 4px">
-    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px;text-transform:uppercase;letter-spacing:1px">${meeting}</div>
-    <div style="font-size:11px;color:var(--muted);margin-top:2px">${S.meetingSessions.length} sessions</div>
-  </div>`;
-
-  S.meetingSessions.forEach(ms => {
-    const startMs   = ms.date_start ? new Date(ms.date_start).getTime() : 0;
-    const endMs     = ms.date_end   ? new Date(ms.date_end).getTime()   : 0;
-    const isCurrent = ms.session_key === S.session?.session_key;
-    const isLiveNow = startMs <= nowMs && (!endMs || nowMs - endMs < 4*3600000);
-    const isDone    = endMs   && nowMs > endMs + 4*3600000;
-    const isNext    = !isCurrent && !isDone && startMs > nowMs;
-    const isFuture  = startMs > nowMs && !isNext;
-
-    const dateFmt = ms.date_start
-      ? new Date(ms.date_start).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}) : '—';
-    const timeFmt = ms.date_start
-      ? new Date(ms.date_start).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '—';
-
-    /* Status pill */
-    let pill, pillCol;
-    if(isLiveNow && isCurrent){
-      pill='● LIVE'; pillCol='var(--green)';
-    } else if(isDone){
-      pill='✓ Done'; pillCol='var(--muted)';
-    } else if(isCurrent && !isLiveNow){
-      pill='Recent'; pillCol='var(--gold)';
-    } else {
-      /* countdown */
-      const diffMs = startMs - nowMs;
-      const diffH  = Math.floor(diffMs/3600000);
-      const diffD  = Math.floor(diffH/24);
-      pill = diffD > 0 ? `in ${diffD}d ${diffH%24}h` : diffH > 0 ? `in ${diffH}h ${Math.floor((diffMs%3600000)/60000)}m` : `in ${Math.floor(diffMs/60000)}m`;
-      pillCol = 'var(--red)';
-    }
-
-    /* Accordion toggle — each row is a <details> element */
-    const borderLeft = isCurrent ? 'border-left:3px solid var(--red)' : isDone ? 'border-left:3px solid var(--border)' : 'border-left:3px solid transparent';
-    html += `
-    <details class="wknd-item" style="margin:0 12px 6px;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;${borderLeft}">
-      <summary style="list-style:none;display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;user-select:none">
-        <div style="flex:1;min-width:0">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;text-transform:uppercase;
-            ${isDone?'color:var(--muted)':''}">${ms.session_name||'Session'}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px">${dateFmt} · ${timeFmt}</div>
-        </div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;
-          white-space:nowrap;color:${pillCol}">${pill}</div>
-        <div style="color:var(--muted);font-size:12px;flex-shrink:0">▾</div>
-      </summary>
-      <div style="padding:10px 13px 12px;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div>
-          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Start</div>
-          <div style="font-size:13px;margin-top:3px">${dateFmt}<br>${timeFmt}</div>
-        </div>
-        <div>
-          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">End</div>
-          <div style="font-size:13px;margin-top:3px">${ms.date_end
-            ? new Date(ms.date_end).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})
-            : '—'}</div>
-        </div>
-        <div>
-          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Type</div>
-          <div style="font-size:13px;margin-top:3px">${ms.session_type||ms.session_name||'—'}</div>
-        </div>
-        <div>
-          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Location</div>
-          <div style="font-size:13px;margin-top:3px">${ms.circuit_short_name||ms.location||'—'}</div>
-        </div>
-      </div>
-    </details>`;
+  const wrap=$('sx-weekend-wrap'); if(!wrap) return;
+  if(!S.meetingSessions.length){ wrap.innerHTML='<div class="smsg"><div class="ico">📆</div><h3>No weekend data</h3></div>'; return; }
+  const nowMs=Date.now(),meeting=S.session?.meeting_name||'Race Weekend';
+  let html=`<div style="padding:10px 12px 4px"><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px;text-transform:uppercase;letter-spacing:1px">${meeting}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${S.meetingSessions.length} sessions</div></div>`;
+  S.meetingSessions.forEach(ms=>{
+    const startMs=ms.date_start?new Date(ms.date_start).getTime():0;
+    const endMs=ms.date_end?new Date(ms.date_end).getTime():0;
+    const isCurrent=ms.session_key===S.session?.session_key;
+    const isLiveNow=startMs<=nowMs&&(!endMs||nowMs-endMs<4*3600000);
+    const isDone=endMs&&nowMs>endMs+4*3600000;
+    const dateFmt=ms.date_start?new Date(ms.date_start).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}):'—';
+    const timeFmt=ms.date_start?new Date(ms.date_start).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'—';
+    let pill,pillCol;
+    if(isLiveNow&&isCurrent){pill='● LIVE';pillCol='var(--green)';}
+    else if(isDone){pill='✓ Done';pillCol='var(--muted)';}
+    else if(isCurrent&&!isLiveNow){pill='Recent';pillCol='var(--gold)';}
+    else{ const d=startMs-nowMs,h=Math.floor(d/3600000),dd=Math.floor(h/24); pill=dd>0?`in ${dd}d ${h%24}h`:h>0?`in ${h}h ${Math.floor((d%3600000)/60000)}m`:`in ${Math.floor(d/60000)}m`; pillCol='var(--red)'; }
+    const bl=isCurrent?'border-left:3px solid var(--red)':isDone?'border-left:3px solid var(--border)':'border-left:3px solid transparent';
+    html+=`<details class="wknd-item" style="margin:0 12px 6px;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;${bl}"><summary style="list-style:none;display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;user-select:none"><div style="flex:1;min-width:0"><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;text-transform:uppercase;${isDone?'color:var(--muted)':''}">${ms.session_name||'Session'}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${dateFmt} · ${timeFmt}</div></div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;white-space:nowrap;color:${pillCol}">${pill}</div><div style="color:var(--muted);font-size:12px;flex-shrink:0">▾</div></summary><div style="padding:10px 13px 12px;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Start</div><div style="font-size:13px;margin-top:3px">${dateFmt}<br>${timeFmt}</div></div><div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">End</div><div style="font-size:13px;margin-top:3px">${ms.date_end?new Date(ms.date_end).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'—'}</div></div><div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Type</div><div style="font-size:13px;margin-top:3px">${ms.session_type||ms.session_name||'—'}</div></div><div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Location</div><div style="font-size:13px;margin-top:3px">${ms.circuit_short_name||ms.location||'—'}</div></div></div></details>`;
   });
-
-  html += '<div style="height:8px"></div>';
-  wrap.innerHTML = html;
-
-  /* Auto-open the current/next session */
-  const items = wrap.querySelectorAll('details.wknd-item');
-  const currentIdx = S.meetingSessions.findIndex(ms => ms.session_key === S.session?.session_key);
-  if(items[currentIdx]) items[currentIdx].open = true;
+  html+='<div style="height:8px"></div>'; wrap.innerHTML=html;
+  const items=wrap.querySelectorAll('details.wknd-item');
+  const ci=S.meetingSessions.findIndex(ms=>ms.session_key===S.session?.session_key);
+  if(items[ci]) items[ci].open=true;
 }
 
-/* ── Driver Timings ── */
 function renderTimings(){
-  const wrap = $('sx-timing-wrap');
-  if(!S.positions.length){
-    wrap.innerHTML = '<div class="smsg"><div class="ico">⏱️</div><h3>No timing data</h3></div>';
-    return;
-  }
-  let html = `<div class="timing-wrap">
-    <div class="timing-hdr">
-      <div>P</div><div></div><div>Driver</div>
-      <div>Last Lap</div><div>Gap</div><div>T</div>
-    </div>`;
-  S.positions.forEach(p => {
-    const dr   = S.drivers[p.driver_number] || {};
-    const lap  = S.laps[p.driver_number];
-    const st   = S.stints[p.driver_number];
-    const iv   = S.intervals[p.driver_number];
-    const pos  = p.position;
-    const isFl = S.fastestLap?.driver_number === p.driver_number;
-    const col  = dr.team_colour ? '#'+dr.team_colour : '#555';
-    const pcls = pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
-    const inPit= st?.pit_in_time && !st?.pit_out_time;
-
+  const wrap=$('sx-timing-wrap');
+  if(!S.positions.length){ wrap.innerHTML='<div class="smsg"><div class="ico">⏱️</div><h3>No timing data</h3></div>'; return; }
+  let html=`<div class="timing-wrap"><div class="timing-hdr"><div>P</div><div></div><div>Driver</div><div>Last Lap</div><div>Gap</div><div>T</div></div>`;
+  S.positions.forEach(p=>{
+    const dr=S.drivers[p.driver_number]||{},lap=S.laps[p.driver_number],st=S.stints[p.driver_number],iv=S.intervals[p.driver_number];
+    const pos=p.position,isFl=S.fastestLap?.driver_number===p.driver_number;
+    const col=dr.team_colour?'#'+dr.team_colour:'#555';
+    const pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
+    const inPit=st?.pit_in_time&&!st?.pit_out_time,isRetired=S.retiredDrivers.has(p.driver_number);
     let gapTxt;
-    if(pos===1){ gapTxt=`<div class="trow-gap ldr">LEAD</div>`; }
-    else if(iv?.gap_to_leader!=null){
-      const g=iv.gap_to_leader;
-      gapTxt=`<div class="trow-gap">${typeof g==='string'?g:'+'+Number(g).toFixed(3)+'s'}</div>`;
-    } else { gapTxt=`<div class="trow-gap">—</div>`; }
-
-    const lapTxt = lap?.lap_duration
-      ? `<div class="trow-time${isFl?' fl':''}">${fmtLap(lap.lap_duration)}</div>`
-      : `<div class="trow-time" style="color:var(--muted)">—</div>`;
-
-    html += `<div class="trow">
-      <div class="trow-pos ${pcls}">${pos}</div>
-      <div style="width:4px;height:28px;border-radius:2px;background:${col};flex-shrink:0"></div>
-      <div style="min-width:0">
-        <div class="trow-name">${dr.name_acronym||dr.full_name||'#'+p.driver_number}</div>
-        <div class="trow-sub">${dr.team_name||'—'}${inPit?' <span style="color:#ff8c00">·PIT</span>':''}</div>
-      </div>
-      ${lapTxt}
-      ${gapTxt}
-      <div style="text-align:right">${tyreHTML(st?.compound)}</div>
-    </div>`;
+    if(pos===1) gapTxt='<div class="trow-gap ldr">LEAD</div>';
+    else if(iv?.gap_to_leader!=null){ const g=iv.gap_to_leader; gapTxt=`<div class="trow-gap">${typeof g==='string'?g:'+'+Number(g).toFixed(3)+'s'}</div>`; }
+    else gapTxt='<div class="trow-gap">—</div>';
+    const lapTxt=lap?.lap_duration?`<div class="trow-time${isFl?' fl':''}">${fmtLap(lap.lap_duration)}</div>`:'<div class="trow-time" style="color:var(--muted)">—</div>';
+    html+=`<div class="trow${isRetired?' dnf':''}"><div class="trow-pos ${pcls}">${pos}</div><div style="width:4px;height:28px;border-radius:2px;background:${col};flex-shrink:0"></div><div style="min-width:0"><div class="trow-name">${dr.name_acronym||dr.full_name||'#'+p.driver_number}</div><div class="trow-sub">${dr.team_name||'—'}${inPit?' <span style="color:#ff8c00">·PIT</span>':''}${isRetired?' <span style="color:var(--muted)">·DNF</span>':''}</div></div>${lapTxt}${gapTxt}<div style="text-align:right">${tyreHTML(st?.compound)}</div></div>`;
   });
-  html += '</div>';
-  wrap.innerHTML = html;
+  html+='</div>'; wrap.innerHTML=html;
 }
 
-/* ── Weather ── */
 function renderWeather(){
-  const wrap = $('sx-wx-wrap');
-  const wx = S.weather;
-  if(!wx){
-    wrap.innerHTML = '<div class="smsg"><div class="ico">🌤️</div><h3>No weather data</h3><p>Weather available during active sessions</p></div>';
-    return;
-  }
-  const cond = wx.rainfall ? '🌧️ WET' : '☀️ DRY';
-  const condCol = wx.rainfall ? '#1e90ff' : '#00d27f';
-  const dirs = ['N','NE','E','SE','S','SW','W','NW'];
-  const windDir = wx.wind_direction!=null ? dirs[Math.round(wx.wind_direction/45)%8] : '—';
-  wrap.innerHTML = `
-    <div class="igrid">
-      <div class="icard"><div class="ilbl">Condition</div>
-        <div class="ival" style="font-size:16px;color:${condCol}">${cond}</div></div>
-      <div class="icard"><div class="ilbl">Air Temp</div>
-        <div class="ival">${wx.air_temperature??'—'}°C</div></div>
-      <div class="icard"><div class="ilbl">Track Temp</div>
-        <div class="ival red">${wx.track_temperature??'—'}°C</div></div>
-      <div class="icard"><div class="ilbl">Humidity</div>
-        <div class="ival">${wx.humidity??'—'}%</div></div>
-      <div class="icard"><div class="ilbl">Wind</div>
-        <div class="ival" style="font-size:18px">${wx.wind_speed??'—'}<span style="font-size:12px;color:var(--muted)"> m/s ${windDir}</span></div></div>
-      <div class="icard"><div class="ilbl">Pressure</div>
-        <div class="ival" style="font-size:16px">${wx.pressure??'—'}<span style="font-size:11px;color:var(--muted)"> mbar</span></div></div>
-    </div>`;
+  const wrap=$('sx-wx-wrap'),wx=S.weather;
+  if(!wx){ wrap.innerHTML='<div class="smsg"><div class="ico">🌤️</div><h3>No weather data</h3><p>Weather available during active sessions</p></div>'; return; }
+  const cond=wx.rainfall?'🌧️ WET':'☀️ DRY',condCol=wx.rainfall?'#1e90ff':'#00d27f';
+  const dirs=['N','NE','E','SE','S','SW','W','NW'],windDir=wx.wind_direction!=null?dirs[Math.round(wx.wind_direction/45)%8]:'—';
+  wrap.innerHTML=`<div class="igrid"><div class="icard"><div class="ilbl">Condition</div><div class="ival" style="font-size:16px;color:${condCol}">${cond}</div></div><div class="icard"><div class="ilbl">Air Temp</div><div class="ival">${wx.air_temperature??'—'}°C</div></div><div class="icard"><div class="ilbl">Track Temp</div><div class="ival red">${wx.track_temperature??'—'}°C</div></div><div class="icard"><div class="ilbl">Humidity</div><div class="ival">${wx.humidity??'—'}%</div></div><div class="icard"><div class="ilbl">Wind</div><div class="ival" style="font-size:18px">${wx.wind_speed??'—'}<span style="font-size:12px;color:var(--muted)"> m/s ${windDir}</span></div></div><div class="icard"><div class="ilbl">Pressure</div><div class="ival" style="font-size:16px">${wx.pressure??'—'}<span style="font-size:11px;color:var(--muted)"> mbar</span></div></div></div>`;
 }
 
-/* ── Live Feed ── */
+/* ═══ LIVE FEED ═══════════════════════════ */
+/* classifyCtrl returns 'sc'|'vsc'|'redflag'|'' for styling */
+function classifyCtrl(m){
+  const f=(m.flag||m.category||m.message||'').toUpperCase();
+  if(/VIRTUAL.SAFETY.CAR|VSC/.test(f)) return 'vsc';
+  if(/SAFETY.CAR/.test(f)) return 'sc';
+  if(/RED.FLAG|RED_FLAG/.test(f)||f==='RED') return 'redflag';
+  return '';
+}
+function flagHtml(flag,cat){
+  if(!flag&&!cat) return '';
+  const f=(flag||cat||'').toUpperCase();
+  const cls=f.includes('GREEN')?'green':f.includes('YELLOW')||f.includes('CAUTION')?'yellow':f.includes('RED')?'red':f.includes('VSC')?'vsc':f.includes('SC')?'sc':f.includes('DRS')?'drs':f.includes('CHEQUERED')||f.includes('FINISH')?'chk':'';
+  const label=f.includes('VIRTUAL_SAFETY_CAR')||f.includes('VSC')?'VSC':f.includes('SAFETY_CAR')||f==='SC'?'SC':f.includes('GREEN')?'GREEN':f.includes('YELLOW')?'YEL':f.includes('RED')?'RED':f.includes('DRS')?'DRS':f.includes('CHEQUERED')?'🏁':f.slice(0,6);
+  return cls?`<span class="lf-flag ${cls}">${label}</span>`:'';
+}
+
 async function fetchLiveFeed(){
-  if(!S.sk) return;
-
-  /* ── Team Radio (incremental by date) ──────────────────────────
-     Filter to only messages newer than the last one we saw.
-     This keeps payloads tiny instead of re-fetching all ~200 clips. */
-  const radioUrl = `/team_radio?session_key=${S.sk}`
-    + (_lastRadioTs ? `&date>${_lastRadioTs}` : '');
-  const radio = await apiFetch(radioUrl).catch(()=>null);
-  if(radio && radio.length){
-    radio.sort((a,b) => new Date(b.date)-new Date(a.date));
-    _lastRadioTs = radio[0].date; // track newest seen
-    S.radioMsgs  = [...radio, ...S.radioMsgs].slice(0, CAP_RADIO);
+  if(!S.sk||!S.isLive){ renderLiveFeed(); return; }
+  const radioUrl=`/team_radio?session_key=${S.sk}`+(_lastRadioTs?`&date>${_lastRadioTs}`:'');
+  const radio=await apiFetch(radioUrl).catch(()=>null);
+  if(radio&&radio.length){
+    radio.sort((a,b)=>new Date(b.date)-new Date(a.date));
+    _lastRadioTs=radio[0].date;
+    S.radioMsgs=[...radio,...S.radioMsgs].slice(0,CAP_RADIO);
+    radio.forEach(m=>{ if(m.recording_url&&!S.radioTranscripts[m.recording_url]) transcribeRadio(m.recording_url); });
   }
-
-  /* ── Race Control (incremental by date) ──────────────────────── */
-  const ctrlUrl = `/race_control?session_key=${S.sk}`
-    + (_lastCtrlTs ? `&date>${_lastCtrlTs}` : '');
-  const ctrl = await apiFetch(ctrlUrl).catch(()=>null);
-  if(ctrl && ctrl.length){
-    ctrl.sort((a,b) => new Date(b.date)-new Date(a.date));
-    _lastCtrlTs = ctrl[0].date;
-    S.ctrlMsgs  = [...ctrl, ...S.ctrlMsgs].slice(0, CAP_CTRL);
+  const ctrlUrl=`/race_control?session_key=${S.sk}`+(_lastCtrlTs?`&date>${_lastCtrlTs}`:'');
+  const ctrl=await apiFetch(ctrlUrl).catch(()=>null);
+  if(ctrl&&ctrl.length){
+    ctrl.sort((a,b)=>new Date(b.date)-new Date(a.date));
+    _lastCtrlTs=ctrl[0].date;
+    S.ctrlMsgs=[...ctrl,...S.ctrlMsgs].slice(0,CAP_CTRL);
   }
-
-  /* ── Lap Notes (only pit-out laps — already in S.laps, no extra fetch) ───
-     We derive lap notes from S.laps which is already fetched in loadAll.
-     No separate /laps fetch here — avoids the duplicate large payload. */
-  const pitOuts = Object.values(S.laps).filter(l => l.is_pit_out_lap);
+  const pitOuts=Object.values(S.laps).filter(l=>l.is_pit_out_lap);
   if(pitOuts.length){
-    const seen = new Set(S.lapComments.map(l => l.driver_number+'|'+l.lap_number));
-    const fresh = pitOuts.filter(l => !seen.has(l.driver_number+'|'+l.lap_number));
-    if(fresh.length){
-      fresh.sort((a,b) => (b.lap_number||0)-(a.lap_number||0));
-      S.lapComments = [...fresh, ...S.lapComments].slice(0, CAP_LAPS);
-    }
+    const seen=new Set(S.lapComments.map(l=>l.driver_number+'|'+l.lap_number));
+    const fresh=pitOuts.filter(l=>!seen.has(l.driver_number+'|'+l.lap_number));
+    if(fresh.length){ fresh.sort((a,b)=>(b.lap_number||0)-(a.lap_number||0)); S.lapComments=[...fresh,...S.lapComments].slice(0,CAP_LAPS); }
   }
-
   renderLiveFeed();
 }
 
-function fmtTs(dateStr){
-  if(!dateStr) return '—';
-  return new Date(dateStr).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-}
-
-function flagHtml(flag, cat){
-  if(!flag && !cat) return '';
-  const f = (flag||cat||'').toUpperCase();
-  const cls = f.includes('GREEN')?'green':f.includes('YELLOW')||f.includes('CAUTION')?'yellow':
-              f.includes('RED')?'red':f.includes('VSC')?'vsc':f.includes('SC')?'sc':
-              f.includes('DRS')?'drs':f.includes('CHEQUERED')||f.includes('FINISH')?'chk':'';
-  const label = f.includes('VIRTUAL_SAFETY_CAR')||f.includes('VSC')?'VSC':
-                f.includes('SAFETY_CAR')||f==='SC'?'SC':
-                f.includes('GREEN')?'GREEN':f.includes('YELLOW')?'YEL':
-                f.includes('RED')?'RED':f.includes('DRS')?'DRS':
-                f.includes('CHEQUERED')?'🏁':f.slice(0,6);
-  return cls ? `<span class="lf-flag ${cls}">${label}</span>` : '';
+async function transcribeRadio(url,isRetry){
+  if(!isRetry&&S.radioTranscripts[url]) return;
+  S.radioTranscripts[url]={status:'pending',text:''}; renderLiveFeed();
+  try{
+    const audioRes=await fetch(url); if(!audioRes.ok) throw new Error('Audio fetch failed');
+    const blob=await audioRes.blob();
+    const b64=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(blob); });
+    const apiRes=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:120,messages:[{role:'user',content:[
+        {type:'document',source:{type:'base64',media_type:'audio/mpeg',data:b64}},
+        {type:'text',text:'Transcribe this F1 team radio clip verbatim. Return ONLY the spoken words — no labels, no quotes, no explanation. If inaudible or silent write: [inaudible]'}
+      ]}]})
+    });
+    if(!apiRes.ok){ const e=await apiRes.json().catch(()=>({})); throw new Error(e?.error?.message||`HTTP ${apiRes.status}`); }
+    const data=await apiRes.json();
+    const text=data?.content?.find(b=>b.type==='text')?.text?.trim()||'[inaudible]';
+    S.radioTranscripts[url]={status:'done',text};
+  }catch(err){ S.radioTranscripts[url]={status:'err',text:'',url}; }
+  renderLiveFeed();
 }
 
 function renderLiveFeed(){
-  const wrap = $('lv-wrap');
-  if(!wrap) return;
-
-  const hasRadio = S.radioMsgs.length > 0;
-  const hasCtrl  = S.ctrlMsgs.length > 0;
-  const hasLaps  = S.lapComments.length > 0;
-
-  if(!hasRadio && !hasCtrl && !hasLaps){
-    wrap.innerHTML = `<div class="smsg"><div class="ico">📡</div><h3>No live feed data</h3>
-      <p>Team radio, race control messages and lap notes will appear here during a session.</p></div>`;
+  const wrap=$('lv-wrap'); if(!wrap) return;
+  if(!S.isLive){
+    const sess=S.session,nextStart=sess?.date_start?new Date(sess.date_start):null,nowMs=Date.now();
+    let countdown='';
+    if(nextStart&&nextStart.getTime()>nowMs){ const d=nextStart.getTime()-nowMs,h=Math.floor(d/3600000),m=Math.floor((d%3600000)/60000); countdown=h>0?`Starts in ${h}h ${m}m`:`Starts in ${m}m`; }
+    wrap.innerHTML=`<div class="lf-notlive"><div class="ico">📡</div><h3>Race Not Live</h3><p>Live Feed only shows data during an active session.<br>${countdown?`<span style="color:var(--green);font-weight:700">${countdown}</span>`:'Check back on race day.'}</p></div>`;
     return;
   }
+  const hasRadio=S.radioMsgs.length>0,hasCtrl=S.ctrlMsgs.length>0,hasLaps=S.lapComments.length>0;
+  if(!hasRadio&&!hasCtrl&&!hasLaps){ wrap.innerHTML=`<div class="smsg"><div class="ico">📡</div><h3>Waiting for data…</h3><p>Team radio, race control and lap notes appear here during a live session.</p></div>`; return; }
 
-  let html = '<div class="lf-wrap">';
+  let html='<div class="lf-wrap">';
 
-  /* ── Race Control ── */
-  html += `<div class="lf-section">
-    <div class="lf-hdr"><span>🚦</span> Race Control <span class="lf-count">${S.ctrlMsgs.length}</span></div>`;
+  // Race Control — with SC/VSC/Red Flag alert banners
+  html+=`<div class="lf-section"><div class="lf-hdr"><span>🚦</span> Race Control <span class="lf-count">${S.ctrlMsgs.length}</span></div>`;
   if(hasCtrl){
-    S.ctrlMsgs.forEach(m => {
-      const fg = flagHtml(m.flag, m.category);
-      const cat = m.category ? `<span style="color:var(--muted)">${m.category}</span>` : '';
-      html += `<div class="lf-item ctrl">
-        <div class="lf-meta">
-          <span class="lf-time">${fmtTs(m.date)}</span>
-          ${m.lap_number?`<span>Lap ${m.lap_number}</span>`:''}
-          ${fg}${cat}
-        </div>
+    S.ctrlMsgs.forEach(m=>{
+      const type=classifyCtrl(m),fg=flagHtml(m.flag,m.category),cat=m.category?`<span style="color:var(--muted)">${m.category}</span>`:'';
+      const alertMap={sc:'🚗 SAFETY CAR',vsc:'🐢 VIRTUAL SC',redflag:'🔴 RED FLAG'};
+      const alertHtml=alertMap[type]?`<div class="lf-alert ${type}">${alertMap[type]}</div>`:'';
+      html+=`<div class="lf-item ctrl${type?' '+type:''}">
+        ${alertHtml}
+        <div class="lf-meta"><span class="lf-time">${fmtTs(m.date)}</span>${m.lap_number?`<span>Lap ${m.lap_number}</span>`:''} ${fg}${cat}</div>
         <div class="lf-msg">${m.message||'—'}</div>
       </div>`;
     });
-  } else {
-    html += '<div class="lf-empty">No race control messages yet</div>';
-  }
-  html += '</div>';
+  } else html+='<div class="lf-empty">No race control messages yet</div>';
+  html+='</div>';
 
-  /* ── Team Radio ── */
-  html += `<div class="lf-section">
-    <div class="lf-hdr"><span>📻</span> Team Radio <span class="lf-count">${S.radioMsgs.length}</span></div>`;
+  // Team Radio — transcripts with retry button
+  html+=`<div class="lf-section"><div class="lf-hdr"><span>📻</span> Team Radio <span class="lf-count">${S.radioMsgs.length}</span></div>`;
   if(hasRadio){
-    S.radioMsgs.forEach(m => {
-      const dr  = S.drivers[m.driver_number] || {};
-      const col = dr.team_colour ? '#'+dr.team_colour : '#888';
-      const name = dr.name_acronym || dr.full_name || '#'+m.driver_number;
-      html += `<div class="lf-item radio">
-        <div class="lf-meta">
-          <span class="lf-driver" style="color:${col}">${name}</span>
-          <span style="color:var(--muted);font-size:10px">${dr.team_name||''}</span>
-          <span class="lf-time" style="margin-left:auto">${fmtTs(m.date)}</span>
-        </div>`;
-      if(m.recording_url){
-        /* Show an audio player for the actual radio clip */
-        html += `<div class="lf-audio">
-          <audio controls preload="none" style="flex:1;height:28px;min-width:0;accent-color:var(--gold)">
-            <source src="${m.recording_url}" type="audio/mpeg">
-          </audio>
-        </div>`;
-      } else {
-        html += `<div class="lf-msg" style="color:var(--muted);font-style:italic">Audio not available</div>`;
-      }
-      html += '</div>';
+    S.radioMsgs.forEach(m=>{
+      const dr=S.drivers[m.driver_number]||{},col=dr.team_colour?'#'+dr.team_colour:'#888',name=dr.name_acronym||dr.full_name||'#'+m.driver_number;
+      const tr=m.recording_url?S.radioTranscripts[m.recording_url]:null;
+      let txHtml;
+      if(!m.recording_url) txHtml='<div class="radio-transcript err">No recording available</div>';
+      else if(!tr) txHtml='<div class="radio-transcript pending">⏳ Queued for transcription…</div>';
+      else if(tr.status==='pending') txHtml='<div class="radio-transcript pending">🎙️ Transcribing…</div>';
+      else if(tr.status==='err') txHtml=`<div class="radio-transcript err">Could not transcribe<br><button class="retry-btn" onclick="transcribeRadio('${m.recording_url.replace(/'/g,"\\'")}',true)">↻ Retry</button></div>`;
+      else txHtml=`<div class="radio-transcript">${tr.text}</div>`;
+      html+=`<div class="lf-item radio"><div class="lf-meta"><span class="lf-driver" style="color:${col}">${name}</span><span style="color:var(--muted);font-size:10px">${dr.team_name||''}</span><span class="lf-time" style="margin-left:auto">${fmtTs(m.date)}</span></div>${txHtml}</div>`;
     });
-  } else {
-    html += '<div class="lf-empty">No team radio clips yet</div>';
-  }
-  html += '</div>';
+  } else html+='<div class="lf-empty">No team radio yet</div>';
+  html+='</div>';
 
-  /* ── Lap Notes ── */
-  html += `<div class="lf-section">
-    <div class="lf-hdr"><span>📋</span> Lap Notes <span class="lf-count">${S.lapComments.length}</span></div>`;
+  // Lap Notes
+  html+=`<div class="lf-section"><div class="lf-hdr"><span>📋</span> Lap Notes <span class="lf-count">${S.lapComments.length}</span></div>`;
   if(hasLaps){
-    S.lapComments.forEach(l => {
-      const dr  = S.drivers[l.driver_number] || {};
-      const col = dr.team_colour ? '#'+dr.team_colour : '#888';
-      const name = dr.name_acronym || dr.full_name || '#'+l.driver_number;
-      const note = l.is_pit_out_lap ? '🔧 Out lap after pit stop' : `⏱ Lap ${l.lap_number} · ${fmtLap(l.lap_duration)}`;
-      html += `<div class="lf-item lap">
-        <div class="lf-meta">
-          <span class="lf-driver" style="color:${col}">${name}</span>
-          <span class="lf-time" style="margin-left:auto">Lap ${l.lap_number||'—'}</span>
-        </div>
-        <div class="lf-msg">${note}</div>
-      </div>`;
+    S.lapComments.forEach(l=>{
+      const dr=S.drivers[l.driver_number]||{},col=dr.team_colour?'#'+dr.team_colour:'#888',name=dr.name_acronym||dr.full_name||'#'+l.driver_number;
+      const note=l.is_pit_out_lap?'🔧 Out lap after pit stop':`⏱ Lap ${l.lap_number} · ${fmtLap(l.lap_duration)}`;
+      html+=`<div class="lf-item lap"><div class="lf-meta"><span class="lf-driver" style="color:${col}">${name}</span><span class="lf-time" style="margin-left:auto">Lap ${l.lap_number||'—'}</span></div><div class="lf-msg">${note}</div></div>`;
     });
-  } else {
-    html += '<div class="lf-empty">No lap notes yet</div>';
-  }
-  html += '</div>';
-
-  html += '</div>';
-  wrap.innerHTML = html;
+  } else html+='<div class="lf-empty">No lap notes yet</div>';
+  html+='</div></div>';
+  wrap.innerHTML=html;
 }
 
-/* ── Schedule ── */
 async function loadSchedule(){
-  try {
-    const ms = await apiFetch(`/meetings?year=${S.dataYear||CURRENT_YEAR}`).catch(()=>[]);
-    if(!ms.length){
-      $('sc-wrap').innerHTML='<div class="smsg"><div class="ico">📅</div><h3>No calendar data</h3></div>';
-      return;
-    }
-    ms.sort((a,b) => new Date(a.date_start)-new Date(b.date_start));
-    const now = Date.now();
-    let html = '<div class="slist">';
-    ms.forEach((m,i) => {
-      const start  = m.date_start ? new Date(m.date_start).getTime() : 0;
-      const isCurr = S.session?.meeting_key === m.meeting_key;
-      const isPast = start && start < now;
-      const ds     = m.date_start ? new Date(m.date_start).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '—';
-      html += `<div class="scard${isCurr?' now':isPast?' past':''}">
-        <div>
-          <div class="sname">${m.meeting_name||m.country_name||'—'}</div>
-          <div class="sdate">${m.circuit_short_name||m.location||''} · ${ds}
-            ${isCurr?'<span style="color:var(--red);font-weight:700"> ← NOW</span>':''}
-            ${isPast&&!isCurr?' <span style="color:var(--green)">✓</span>':''}
-          </div>
-        </div>
-        <div class="srnd">R${i+1}</div>
-      </div>`;
+  try{
+    const ms=await apiFetch(`/meetings?year=${S.dataYear||CURRENT_YEAR}`).catch(()=>[]);
+    if(!ms.length){ $('sc-wrap').innerHTML='<div class="smsg"><div class="ico">📅</div><h3>No calendar data</h3></div>'; return; }
+    ms.sort((a,b)=>new Date(a.date_start)-new Date(b.date_start));
+    const now=Date.now(); let html='<div class="slist">';
+    ms.forEach((m,i)=>{
+      const start=m.date_start?new Date(m.date_start).getTime():0;
+      const isCurr=S.session?.meeting_key===m.meeting_key,isPast=start&&start<now;
+      const ds=m.date_start?new Date(m.date_start).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'—';
+      html+=`<div class="scard${isCurr?' now':isPast?' past':''}"><div><div class="sname">${m.meeting_name||m.country_name||'—'}</div><div class="sdate">${m.circuit_short_name||m.location||''} · ${ds}${isCurr?' <span style="color:var(--red);font-weight:700"> ← NOW</span>':''}${isPast&&!isCurr?' <span style="color:var(--green)">✓</span>':''}</div></div><div class="srnd">R${i+1}</div></div>`;
     });
-    html += '</div>';
-    $('sc-wrap').innerHTML = html;
-  } catch(e){
-    $('sc-wrap').innerHTML = `<div class="smsg"><div class="ico">⚠️</div><h3>Calendar error</h3><p>${e.message}</p></div>`;
-  }
+    html+='</div>'; $('sc-wrap').innerHTML=html;
+  }catch(e){ $('sc-wrap').innerHTML=`<div class="smsg"><div class="ico">⚠️</div><h3>Calendar error</h3><p>${e.message}</p></div>`; }
 }
 
 function showNoData(){
-  $('rname').textContent = 'No Session Found';
-  $('lb-race-wrap').innerHTML = `<div class="smsg"><div class="ico">🏎️</div>
-    <h3>No data available</h3><p>No race sessions found. OpenF1 may not have data for the current season yet.</p></div>`;
+  patchText($('rname'),'No Session Found');
+  $('lb-race-wrap').innerHTML='<div class="smsg"><div class="ico">🏎️</div><h3>No data available</h3><p>No race sessions found. OpenF1 may not have data for the current season yet.</p></div>';
   setStatus(false);
 }
 
-/* ═══════════════════════════════════════════
-   TABS — main + sub
-═══════════════════════════════════════════ */
+/* ═══ TABS ════════════════════════════════ */
 function initTabs(){
-  /* Main tabs */
-  document.querySelectorAll('.tab').forEach(btn => {
-    btn.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(btn=>{
+    btn.addEventListener('click',()=>{
       document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
       document.querySelectorAll('.pane').forEach(p=>p.classList.remove('on'));
-      btn.classList.add('on');
-      $('p-'+btn.dataset.t).classList.add('on');
+      btn.classList.add('on'); $('p-'+btn.dataset.t).classList.add('on');
     });
   });
-
-  /* Sub-tabs — event delegation */
-  document.addEventListener('click', e => {
-    const btn = e.target.closest('.subtab');
-    if(!btn) return;
-    const grp  = btn.closest('.subtabs');
-    const pane = btn.closest('.pane');
-    if(!grp || !pane) return;
-    grp.querySelectorAll('.subtab').forEach(b=>b.classList.remove('on'));
-    btn.classList.add('on');
+  document.addEventListener('click',e=>{
+    const btn=e.target.closest('.subtab'); if(!btn) return;
+    const grp=btn.closest('.subtabs'),pane=btn.closest('.pane'); if(!grp||!pane) return;
+    grp.querySelectorAll('.subtab').forEach(b=>b.classList.remove('on')); btn.classList.add('on');
     pane.querySelectorAll('.subpane').forEach(sp=>sp.classList.remove('on'));
-    const target = pane.querySelector(`#sp-${btn.dataset.s}`);
-    if(target) target.classList.add('on');
+    const t=pane.querySelector(`#sp-${btn.dataset.s}`); if(t) t.classList.add('on');
   });
 }
 
-/* ═══════════════════════════════════════════
-   TIMERS
-═══════════════════════════════════════════ */
-function setTick(ms){
-  if(ms===_curTick && _tickTimer) return;
-  _curTick=ms;
-  clearInterval(_tickTimer);
-  _tickTimer=setInterval(loadAll,ms);
-}
+/* ═══ TIMERS ══════════════════════════════ */
+function setTick(ms){ if(ms===_curTick&&_tickTimer) return; _curTick=ms; clearInterval(_tickTimer); _tickTimer=setInterval(loadAll,ms); }
+function startTimers(){ setTick(TICK_LIVE); }
 
-function startTimers(){
-  setTick(TICK_LIVE); // will adjust to TICK_IDLE once first load completes
-}
-
-/* ═══════════════════════════════════════════
-   BOOT
-═══════════════════════════════════════════ */
+/* ═══ BOOT ════════════════════════════════ */
 initTabs();
-$('fab').addEventListener('click', ()=>{
-  $('fab').classList.add('spin');
-  loadAll().finally(()=>$('fab').classList.remove('spin'));
-});
-/* Boot: full sequential fetch first, then hand off to normal polling */
+$('fab').addEventListener('click',()=>{ $('fab').classList.add('spin'); loadAll().finally(()=>$('fab').classList.remove('spin')); });
 bootLoad().then(startTimers);
 
-/* ═══════════════════════════════════════════
-   PWA SERVICE WORKER
-   Registers sw.js from the same directory.
-   Must be served over HTTPS or localhost.
-═══════════════════════════════════════════ */
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./sw.js').catch(()=>{});
-}
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js').catch(()=>{}); }
 </script>
 </body>
 </html>
