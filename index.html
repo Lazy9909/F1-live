@@ -704,8 +704,8 @@ async function loadAll(){
       const li={}; intArr.forEach(i=>{ if(!li[i.driver_number]||i.date>li[i.driver_number].date) li[i.driver_number]=i; }); S.intervals=li;
     } else S.intervals={};
 
-    // Laps — every tick when recent (lap times update each lap)
-    if(recent){
+    // Laps — fetch once for any started session (live: every tick; finished: once)
+    if(live||!Object.keys(S.laps).length){
       const lapArr=await apiFetch(`/laps?session_key=${S.sk}`).catch(()=>[]);
       if(lapArr.length){
         const ll={}; lapArr.forEach(l=>{ if(!ll[l.driver_number]||l.lap_number>(ll[l.driver_number].lap_number||0)) ll[l.driver_number]=l; }); S.laps=ll;
@@ -718,19 +718,19 @@ async function loadAll(){
     }
     updateLapBar();
 
-    // Stints — slow tick, or immediately if we have none yet
-    if(recent&&(slowTick||!Object.keys(S.stints).length)){
+    // Stints — fetch once for any started session (live: slow tick too)
+    if(!Object.keys(S.stints).length||(live&&slowTick)){
       const stArr=await apiFetch(`/stints?session_key=${S.sk}`).catch(()=>[]);
       if(stArr.length){ const ls={}; stArr.forEach(s=>{ if(!ls[s.driver_number]||s.stint_number>(ls[s.driver_number].stint_number||0)) ls[s.driver_number]=s; }); S.stints=ls; }
     }
 
-    // Weather — live/recent + slow tick
-    if(recent&&(slowTick||!S.weather)){
+    // Weather — fetch once (live: slow tick too)
+    if(!S.weather||(live&&slowTick)){
       const wxArr=await apiFetch(`/weather?session_key=${S.sk}`).catch(()=>[]); S.weather=wxArr.length?wxArr[wxArr.length-1]:null;
     }
 
-    // Live feed — every tick when recent (radio/ctrl are incremental so cost is low)
-    if(recent){ fetchLiveFeed().catch(e=>console.warn('[liveFeed]',e)); }
+    // Live feed — only for live or recently-finished sessions
+    if(live||recent){ fetchLiveFeed().catch(e=>console.warn('[liveFeed]',e)); }
 
     detectRetirements();
 
@@ -764,7 +764,7 @@ async function loadAll(){
         // Also fetch drivers from the race session for name/colour lookup
         if(!Object.keys(S.champDriversRef).length){
           const rdrv=await apiFetch(`/drivers?session_key=${raceSk}`).catch(()=>[]);
-          rdrv.forEach(d=>{ S.champDriversRef[d.driver_number]=d; });
+          rdrv.forEach(d=>{ S.champDriversRef[String(d.driver_number)]=d; });
         }
         const cd=await apiFetch(`/championship_drivers?session_key=${raceSk}`).catch(()=>[]);
         if(cd.length) S.champDrivers=cd.sort((a,b)=>(a.position_current||99)-(b.position_current||99));
@@ -896,10 +896,11 @@ function renderRaceBoard(){
 
 function renderStandings(){
   // Helper: get driver info — prefer race-session ref, fall back to current session drivers
-  const drRef=n=>S.champDriversRef[n]||S.drivers[n]||{};
+  const drRef=n=>S.champDriversRef[String(n)]||S.drivers[n]||{};
   const teamCol=name=>{
-    const d=Object.values(S.champDriversRef).find(d=>d.team_name===name)||
-             Object.values(S.drivers).find(d=>d.team_name===name);
+    if(!name) return '#555';
+    const all=[...Object.values(S.champDriversRef),...Object.values(S.drivers)];
+    const d=all.find(d=>d.team_name===name)||all.find(d=>d.team_name&&(d.team_name.includes(name)||name.includes(d.team_name)));
     return d?.team_colour?'#'+d.team_colour:'#555';
   };
 
