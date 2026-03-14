@@ -131,9 +131,9 @@
 
     /* Timings */
     .timing-wrap{padding:6px 12px 12px;}
-    .timing-hdr{display:grid;grid-template-columns:26px 4px 1fr 80px 72px 26px;gap:6px;align-items:center;padding:5px 8px;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);margin-bottom:4px;}
+    .timing-hdr{display:grid;grid-template-columns:26px 4px 1fr 80px 72px 36px 26px;gap:6px;align-items:center;padding:5px 8px;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);margin-bottom:4px;}
     .timing-hdr div:nth-child(4),.timing-hdr div:nth-child(5){text-align:right;}
-    .trow{display:grid;grid-template-columns:26px 4px 1fr 80px 72px 26px;gap:6px;align-items:center;padding:7px 8px;background:var(--surface);border-radius:6px;margin-bottom:3px;}
+    .trow{display:grid;grid-template-columns:26px 4px 1fr 80px 72px 36px 26px;gap:6px;align-items:center;padding:7px 8px;background:var(--surface);border-radius:6px;margin-bottom:3px;}
     .trow.dnf{opacity:.4;}
     .trow-pos{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:16px;color:var(--muted);text-align:center;}
     .trow-pos.p1{color:var(--gold);}.trow-pos.p2{color:var(--silver);}.trow-pos.p3{color:var(--bronze);}
@@ -394,9 +394,11 @@ const S={
   tickN:0, meetingSessions:[],
   radioMsgs:[], ctrlMsgs:[], lapComments:[],
   prevPositions:{}, posChanges:[],
+  sessionResult:[], startingGrid:[],
+  champDrivers:[], champTeams:[],
 };
 let _tickTimer=null,_curTick=0,_schedDone=false,_liveDone=false;
-let _lastRadioTs=null,_lastCtrlTs=null,_staleTimer=null;
+let _lastRadioTs=null,_lastCtrlTs=null,_lastCtrlSk=null,_staleTimer=null;
 
 function purgeSession(){
   /* Wipes all session data when a new session starts.
@@ -406,9 +408,10 @@ function purgeSession(){
   S.weather=null;S.lapCount=0;S.drvStd=[];S.teamStd=[];
   S.retiredDrivers=new Set();
   S.radioMsgs=[];S.ctrlMsgs=[];S.lapComments=[];
-  _liveDone=false;_lastRadioTs=null;_lastCtrlTs=null;
+  _liveDone=false;_lastRadioTs=null;_lastCtrlTs=null;_lastCtrlSk=null;
   _schedDone=false;
   S.prevPositions={};S.posChanges=[];
+  S.sessionResult=[];S.startingGrid=[];S.champDrivers=[];S.champTeams=[];
 }
 
 /* ═══ DOM HELPERS ═════════════════════════ */
@@ -698,10 +701,34 @@ async function loadAll(){
       const wxArr=await apiFetch(`/weather?session_key=${S.sk}`).catch(()=>[]); S.weather=wxArr.length?wxArr[wxArr.length-1]:null;
     }
 
-    // Live feed — live + recently-finished
-    if(recent&&(slowTick||!_liveDone)){ _liveDone=true; fetchLiveFeed().catch(e=>console.warn('[liveFeed]',e)); }
+    // Live feed — every tick when recent (radio/ctrl are incremental so cost is low)
+    if(recent){ fetchLiveFeed().catch(e=>console.warn('[liveFeed]',e)); }
 
-    detectRetirements(); computeStandings();
+    detectRetirements();
+
+    // Session result — fetch once for finished race sessions
+    const isRace=!!(S.session?.session_name||'').match(/race|grand prix/i);
+    if(!S.isLive&&isRace&&recent&&!S.sessionResult.length){
+      const res=await apiFetch(`/session_result?session_key=${S.sk}`).catch(()=>[]);
+      if(res.length) S.sessionResult=res.sort((a,b)=>a.position-b.position);
+    }
+
+    // Starting grid — fetch once per race session
+    if(isRace&&!S.startingGrid.length){
+      const sg=await apiFetch(`/starting_grid?session_key=${S.sk}`).catch(()=>[]);
+      if(sg.length) S.startingGrid=sg;
+    }
+
+    // Championship standings — by year, slow tick, always (not just race sessions)
+    if(slowTick||!S.champDrivers.length){
+      const yr=S.dataYear||CURRENT_YEAR;
+      const cd=await apiFetch(`/championship_drivers?year=${yr}`).catch(()=>[]);
+      if(cd.length) S.champDrivers=cd.sort((a,b)=>a.position-b.position);
+      const ct=await apiFetch(`/championship_teams?year=${yr}`).catch(()=>[]);
+      if(ct.length) S.champTeams=ct.sort((a,b)=>a.position-b.position);
+    }
+
+    computeStandings();
     renderRaceBoard(); renderStandings(); renderSessionInfo(sess);
     renderTimings(); renderWeather(); renderLiveFeed();
     S.lastUpdated=new Date(); resetStaleTimer();
@@ -745,6 +772,26 @@ function renderRaceBoard(){
     if(banner) banner.outerHTML=bh; else wrap.insertAdjacentHTML('afterbegin',bh);
   }
 
+  // Winner card — shown for finished sessions when we have a P1
+  const isFinished=!S.isLive&&S.positions.length>0;
+  let winnerCard=wrap.querySelector('[data-winner]');
+  if(isFinished){
+    const winner=S.positions.find(p=>p.position===1);
+    if(winner){
+      const wd=S.drivers[winner.driver_number]||{};
+      const wCol=wd.team_colour?'#'+wd.team_colour:'#f5a623';
+      const wLap=S.laps[winner.driver_number];
+      const fl=S.fastestLap?.driver_number===winner.driver_number;
+      const flTxt=fl?`<div style="margin-top:4px;font-size:11px;color:var(--purple)">🟣 Fastest Lap: ${fmtLap(S.fastestLap.lap_duration)}</div>`:
+        (S.fastestLap?`<div style="margin-top:4px;font-size:11px;color:var(--muted)">Fastest: ${(S.drivers[S.fastestLap.driver_number]?.name_acronym||'#'+S.fastestLap.driver_number)} ${fmtLap(S.fastestLap.lap_duration)}</div>`:'');
+      const wHtml=`<div data-winner style="margin:8px 12px;background:linear-gradient(135deg,rgba(245,166,35,.1),rgba(245,166,35,.03));border:1px solid rgba(245,166,35,.3);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:14px"><div style="font-size:32px">🏆</div><div style="flex:1;min-width:0"><div style="font-size:10px;color:var(--gold);font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px">Winner</div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;text-transform:uppercase;color:${wCol}">${wd.full_name||'Driver #'+winner.driver_number}</div><div style="font-size:11px;color:var(--muted);margin-top:1px">${wd.team_name||'—'}</div>${flTxt}</div></div>`;
+      if(!winnerCard){ wrap.insertAdjacentHTML('afterbegin',wHtml); wrap.querySelector('[data-winner]')&&wrap.querySelector('[data-banner]')&&wrap.querySelector('[data-winner]').after(wrap.querySelector('[data-banner]')); }
+      else{ if(winnerCard.innerHTML!==wHtml) winnerCard.outerHTML=wHtml; }
+    }
+  } else {
+    if(winnerCard) winnerCard.remove();
+  }
+
   // Ensure dlist exists
   let list=wrap.querySelector('.dlist');
   if(!list){ list=document.createElement('div'); list.className='dlist'; wrap.appendChild(list); }
@@ -770,7 +817,7 @@ function renderRaceBoard(){
       const g=iv.gap_to_leader;
       gapHTML=`<span class="gap">${typeof g==='string'?g:'+'+Number(g).toFixed(3)+'s'}</span>`;
     } else if(!S.isLive&&pos>1){
-      // Finished session — intervals not available. Show classified position.
+      // Finished session — show classified position P2/P3/etc
       gapHTML=`<span class="gap" style="color:var(--muted);font-size:11px">P${pos}</span>`;
     } else {
       gapHTML='<span class="gap" style="color:var(--muted)">—</span>';
@@ -801,38 +848,63 @@ function renderRaceBoard(){
 }
 
 function renderStandings(){
-  if(!S.drvStd.length){
+  // Drivers — prefer season championship data, fall back to session points
+  if(S.champDrivers.length){
+    const maxD=S.champDrivers[0]?.points||1;
+    let dh=`<div class="standings-wrap"><table class="st-table"><thead><tr><th>Pos</th><th></th><th>Driver</th><th>Team</th><th class="r">Pts</th></tr></thead><tbody>`;
+    S.champDrivers.forEach(r=>{
+      const pos=r.position,pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
+      const col=r.team_colour?'#'+r.team_colour:'#555';
+      const pts=r.points||0;
+      dh+=`<tr><td class="st-pos ${pcls}">${pos}</td><td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td><td><div class="st-name">${r.full_name||r.driver_number||'—'}</div><div class="st-sub">${r.name_acronym||''}</div><div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxD*100)}%;background:${col}"></div></div></td><td><div class="st-sub" style="color:${col}">${r.team_name||'—'}</div></td><td class="r st-pts">${pts}</td></tr>`;
+    });
+    dh+=`</tbody></table><div class="st-note">Season championship standings</div></div>`;
+    $('lb-drv-wrap').innerHTML=dh;
+  } else if(S.drvStd.length){
+    const maxD=S.drvStd[0]?.pts||1;
+    let dh=`<div class="standings-wrap"><table class="st-table"><thead><tr><th>Pos</th><th></th><th>Driver</th><th>Team</th><th class="r">Pts</th></tr></thead><tbody>`;
+    S.drvStd.forEach(({dn,pts,d},i)=>{
+      const pos=i+1,pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'',col=d.team_colour?'#'+d.team_colour:'#555';
+      dh+=`<tr><td class="st-pos ${pcls}">${pos}</td><td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td><td><div class="st-name">${d.full_name||'#'+dn}</div><div class="st-sub">${d.name_acronym||''}</div><div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxD*100)}%;background:${col}"></div></div></td><td><div class="st-sub" style="color:${col}">${d.team_name||'—'}</div></td><td class="r st-pts">${pts}</td></tr>`;
+    });
+    dh+=`</tbody></table><div class="st-note">Session points only · FL bonus applied where eligible</div></div>`;
+    $('lb-drv-wrap').innerHTML=dh;
+  } else {
     $('lb-drv-wrap').innerHTML='<div class="smsg"><div class="ico">👤</div><h3>No standings yet</h3></div>';
-    $('lb-team-wrap').innerHTML='<div class="smsg"><div class="ico">🏭</div><h3>No standings yet</h3></div>';
-    return;
   }
-  const maxD=S.drvStd[0]?.pts||1;
-  let dh=`<div class="standings-wrap"><table class="st-table"><thead><tr><th>Pos</th><th></th><th>Driver</th><th>Team</th><th class="r">Pts</th></tr></thead><tbody>`;
-  S.drvStd.forEach(({dn,pts,d},i)=>{
-    const pos=i+1,pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'',col=d.team_colour?'#'+d.team_colour:'#555';
-    dh+=`<tr><td class="st-pos ${pcls}">${pos}</td><td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td><td><div class="st-name">${d.full_name||'#'+dn}</div><div class="st-sub">${d.name_acronym||''}</div><div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxD*100)}%;background:${col}"></div></div></td><td><div class="st-sub" style="color:${col}">${d.team_name||'—'}</div></td><td class="r st-pts">${pts}</td></tr>`;
-  });
-  dh+=`</tbody></table><div class="st-note">Session points only · FL bonus applied where eligible</div></div>`;
-  $('lb-drv-wrap').innerHTML=dh;
-  const maxT=S.teamStd[0]?.pts||1;
-  let th=`<div class="standings-wrap"><table class="st-table"><thead><tr><th>Pos</th><th></th><th>Constructor</th><th class="r">Pts</th></tr></thead><tbody>`;
-  S.teamStd.forEach(({name,pts,col},i)=>{
-    const pos=i+1,pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
-    th+=`<tr><td class="st-pos ${pcls}">${pos}</td><td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td><td><div class="st-name">${name}</div><div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxT*100)}%;background:${col}"></div></div></td><td class="r st-pts">${pts}</td></tr>`;
-  });
-  th+=`</tbody></table><div class="st-note">Constructor points from this session</div></div>`;
-  $('lb-team-wrap').innerHTML=th;
+  // Teams — prefer season championship data, fall back to session points
+  if(S.champTeams.length){
+    const maxT=S.champTeams[0]?.points||1;
+    let th=`<div class="standings-wrap"><table class="st-table"><thead><tr><th>Pos</th><th></th><th>Constructor</th><th class="r">Pts</th></tr></thead><tbody>`;
+    S.champTeams.forEach(r=>{
+      const pos=r.position,pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
+      const col=r.team_colour?'#'+r.team_colour:'#555';
+      const pts=r.points||0;
+      th+=`<tr><td class="st-pos ${pcls}">${pos}</td><td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td><td><div class="st-name">${r.team_name||'—'}</div><div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxT*100)}%;background:${col}"></div></div></td><td class="r st-pts">${pts}</td></tr>`;
+    });
+    th+=`</tbody></table><div class="st-note">Season championship standings</div></div>`;
+    $('lb-team-wrap').innerHTML=th;
+  } else if(S.teamStd.length){
+    const maxT=S.teamStd[0]?.pts||1;
+    let th=`<div class="standings-wrap"><table class="st-table"><thead><tr><th>Pos</th><th></th><th>Constructor</th><th class="r">Pts</th></tr></thead><tbody>`;
+    S.teamStd.forEach(({name,pts,col},i)=>{
+      const pos=i+1,pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
+      th+=`<tr><td class="st-pos ${pcls}">${pos}</td><td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td><td><div class="st-name">${name}</div><div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxT*100)}%;background:${col}"></div></div></td><td class="r st-pts">${pts}</td></tr>`;
+    });
+    th+=`</tbody></table><div class="st-note">Constructor points from this session</div></div>`;
+    $('lb-team-wrap').innerHTML=th;
+  } else {
+    $('lb-team-wrap').innerHTML='<div class="smsg"><div class="ico">🏭</div><h3>No standings yet</h3></div>';
+  }
 }
 
 /* Returns HTML string for position changes — rendered inside live feed */
 function posChangesHTML(){
   const count=S.posChanges.length;
-  const open=S.isLive&&count>0?' open':'';
+  const open=count>0?' open':'';
   let body='';
-  if(!S.isLive){
-    body='<div class="lf-body"><div class="lf-empty">Position tracking is live-only</div></div>';
-  } else if(!count){
-    body='<div class="lf-body"><div class="lf-empty">No overtakes detected yet this session</div></div>';
+  if(!count){
+    body='<div class="lf-body"><div class="lf-empty">No overtakes detected this session</div></div>';
   } else {
     let rows='';
     S.posChanges.forEach(c=>{
@@ -874,28 +946,30 @@ function renderWeekend(){
     const startMs=ms.date_start?new Date(ms.date_start).getTime():0;
     const endMs=ms.date_end?new Date(ms.date_end).getTime():0;
     const isCurrent=ms.session_key===S.session?.session_key;
-    const isLiveNow=startMs<=nowMs&&(!endMs||nowMs-endMs<4*3600000);
-    const isDone=endMs&&nowMs>endMs+4*3600000;
+    const isLiveNow=startMs&&startMs<=nowMs&&(!endMs||nowMs<endMs);
+    const isDone=endMs?nowMs>endMs:startMs&&(nowMs-startMs)>3*3600000;
     const dateFmt=ms.date_start?new Date(ms.date_start).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}):'—';
     const timeFmt=ms.date_start?new Date(ms.date_start).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'—';
+    const endTimeFmt=ms.date_end?new Date(ms.date_end).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'—';
     let pill,pillCol;
     if(isLiveNow&&isCurrent){pill='● LIVE';pillCol='var(--green)';}
     else if(isDone){pill='✓ Done';pillCol='var(--muted)';}
     else if(isCurrent&&!isLiveNow){pill='Recent';pillCol='var(--gold)';}
     else{ const d=startMs-nowMs,h=Math.floor(d/3600000),dd=Math.floor(h/24); pill=dd>0?`in ${dd}d ${h%24}h`:h>0?`in ${h}h ${Math.floor((d%3600000)/60000)}m`:`in ${Math.floor(d/60000)}m`; pillCol='var(--red)'; }
     const bl=isCurrent?'border-left:3px solid var(--red)':isDone?'border-left:3px solid var(--border)':'border-left:3px solid transparent';
-    html+=`<details class="wknd-item" style="margin:0 12px 6px;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;${bl}"><summary style="list-style:none;display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;user-select:none"><div style="flex:1;min-width:0"><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;text-transform:uppercase;${isDone?'color:var(--muted)':''}">${ms.session_name||'Session'}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${dateFmt} · ${timeFmt}</div></div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;white-space:nowrap;color:${pillCol}">${pill}</div><div style="color:var(--muted);font-size:12px;flex-shrink:0">▾</div></summary><div style="padding:10px 13px 12px;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Start</div><div style="font-size:13px;margin-top:3px">${dateFmt}<br>${timeFmt}</div></div><div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">End</div><div style="font-size:13px;margin-top:3px">${ms.date_end?new Date(ms.date_end).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'—'}</div></div><div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Type</div><div style="font-size:13px;margin-top:3px">${ms.session_type||ms.session_name||'—'}</div></div><div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Location</div><div style="font-size:13px;margin-top:3px">${ms.circuit_short_name||ms.location||'—'}</div></div></div></details>`;
+    html+=`<div class="wknd-card" style="margin:0 12px 6px;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;${bl}"><div style="display:flex;align-items:center;gap:10px;padding:11px 13px"><div style="flex:1;min-width:0"><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;text-transform:uppercase;${isDone?'color:var(--muted)':''}">${ms.session_name||'Session'}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${dateFmt} · ${timeFmt}</div></div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;white-space:nowrap;color:${pillCol}">${pill}</div></div><div style="padding:0 13px 12px;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:0"><div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Start</div><div style="font-size:13px;margin-top:3px">${timeFmt}</div></div><div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">End</div><div style="font-size:13px;margin-top:3px">${endTimeFmt}</div></div><div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Type</div><div style="font-size:13px;margin-top:3px">${ms.session_type||ms.session_name||'—'}</div></div><div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Location</div><div style="font-size:13px;margin-top:3px">${ms.circuit_short_name||ms.location||'—'}</div></div></div></div>`;
   });
   html+='<div style="height:8px"></div>'; wrap.innerHTML=html;
-  const items=wrap.querySelectorAll('details.wknd-item');
-  const ci=S.meetingSessions.findIndex(ms=>ms.session_key===S.session?.session_key);
-  if(items[ci]) items[ci].open=true;
 }
 
 function renderTimings(){
   const wrap=$('sx-timing-wrap');
   if(!S.positions.length){ wrap.innerHTML='<div class="smsg"><div class="ico">⏱️</div><h3>No timing data</h3></div>'; return; }
-  let html=`<div class="timing-wrap"><div class="timing-hdr"><div>P</div><div></div><div>Driver</div><div>Last Lap</div><div>Gap</div><div>T</div></div>`;
+  // Build startingGrid lookup: driver_number → grid position
+  const gridMap={};
+  S.startingGrid.forEach(g=>{ if(g.driver_number!=null) gridMap[g.driver_number]=g.position; });
+  const hasGrid=Object.keys(gridMap).length>0;
+  let html=`<div class="timing-wrap"><div class="timing-hdr"><div>P</div><div></div><div>Driver</div><div>Last Lap</div><div>Gap</div><div style="text-align:center">${hasGrid?'Grid':''}</div><div>T</div></div>`;
   S.positions.forEach(p=>{
     const dr=S.drivers[p.driver_number]||{},lap=S.laps[p.driver_number],st=S.stints[p.driver_number],iv=S.intervals[p.driver_number];
     const pos=p.position,isFl=S.fastestLap?.driver_number===p.driver_number;
@@ -907,7 +981,17 @@ function renderTimings(){
     else if(iv?.gap_to_leader!=null){ const g=iv.gap_to_leader; gapTxt=`<div class="trow-gap">${typeof g==='string'?g:'+'+Number(g).toFixed(3)+'s'}</div>`; }
     else gapTxt='<div class="trow-gap">—</div>';
     const lapTxt=lap?.lap_duration?`<div class="trow-time${isFl?' fl':''}">${fmtLap(lap.lap_duration)}</div>`:'<div class="trow-time" style="color:var(--muted)">—</div>';
-    html+=`<div class="trow${isRetired?' dnf':''}"><div class="trow-pos ${pcls}">${pos}</div><div style="width:4px;height:28px;border-radius:2px;background:${col};flex-shrink:0"></div><div style="min-width:0"><div class="trow-name">${dr.name_acronym||dr.full_name||'#'+p.driver_number}</div><div class="trow-sub">${dr.team_name||'—'}${inPit?' <span style="color:#ff8c00">·PIT</span>':''}${isRetired?' <span style="color:var(--muted)">·DNF</span>':''}</div></div>${lapTxt}${gapTxt}<div style="text-align:right">${tyreHTML(st?.compound)}</div></div>`;
+    let gridTxt='<div></div>';
+    if(hasGrid){
+      const gp=gridMap[p.driver_number];
+      if(gp!=null){
+        const delta=gp-pos; // positive = gained places
+        const sign=delta>0?'▲':delta<0?'▼':'';
+        const col2=delta>0?'var(--green)':delta<0?'var(--red)':'var(--muted)';
+        gridTxt=`<div style="text-align:center;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;color:${col2}">${sign}${delta!==0?Math.abs(delta):gp}</div>`;
+      }
+    }
+    html+=`<div class="trow${isRetired?' dnf':''}"><div class="trow-pos ${pcls}">${pos}</div><div style="width:4px;height:28px;border-radius:2px;background:${col};flex-shrink:0"></div><div style="min-width:0"><div class="trow-name">${dr.name_acronym||dr.full_name||'#'+p.driver_number}</div><div class="trow-sub">${dr.team_name||'—'}${inPit?' <span style="color:#ff8c00">·PIT</span>':''}${isRetired?' <span style="color:var(--muted)">·DNF</span>':''}</div></div>${lapTxt}${gapTxt}${gridTxt}<div style="text-align:right">${tyreHTML(st?.compound)}</div></div>`;
   });
   html+='</div>'; wrap.innerHTML=html;
 }
@@ -945,8 +1029,9 @@ async function fetchLiveFeed(){
     radio.sort((a,b)=>new Date(b.date)-new Date(a.date));
     _lastRadioTs=radio[0].date;
     S.radioMsgs=[...radio,...S.radioMsgs].slice(0,CAP_RADIO);
-
   }
+  // Reset ctrl incremental cursor if session changed
+  if(_lastCtrlSk!==S.sk){ _lastCtrlTs=null; _lastCtrlSk=S.sk; }
   const ctrlUrl=`/race_control?session_key=${S.sk}`+(_lastCtrlTs?`&date>${_lastCtrlTs}`:'');
   const ctrl=await apiFetch(ctrlUrl).catch(()=>null);
   if(ctrl&&ctrl.length){
