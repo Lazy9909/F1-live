@@ -304,12 +304,12 @@ const BASE         = 'https://api.openf1.org/v1';
 const CURRENT_YEAR = new Date().getFullYear();
 const TICK_LIVE    = 12000;
 const TICK_IDLE    = 120000;
-const RL_GAP       = 1000;
+const RL_GAP       = 400;
 const SLOW_EVERY   = 4;
 const STALE_MS     = 35000;
 const PTR_THRESH   = 68;
 const PTS          = [25,18,15,12,10,8,6,4,2,1];
-const CAP_RL_Q     = 12;
+const CAP_RL_Q     = 20;
 
 /* ═══ RATE LIMITER ════════════════════════ */
 let _rlLast=0, _rlQ=[], _rlBusy=false;
@@ -326,22 +326,24 @@ function _drain(){
     try{ res(await fn()); } catch(e){ rej(e); } finally{ _drain(); }
   },delay);
 }
-async function apiFetch(path){
+async function apiFetch(path, retries=2){
   return apiQ(async()=>{
-    const ctrl=new AbortController();
-    const tid=setTimeout(()=>ctrl.abort(),8000);
-    try{
-      const sep=path.includes('?')?'&':'?';
-      const url=BASE+path+sep+'_t='+Math.floor(Date.now()/60000);
-      const r=await fetch(url,{signal:ctrl.signal,cache:'no-store'});
-      clearTimeout(tid);
-      if(!r.ok){ const t=await r.text().catch(()=>''); throw new Error(`${r.status}: ${t.slice(0,80)||path}`); }
-      return r.json();
-    }catch(e){
-      clearTimeout(tid);
-      if(e.name==='AbortError') throw new Error(`Timeout: ${path}`);
-      throw e;
+    let lastErr;
+    for(let attempt=0; attempt<=retries; attempt++){
+      const ctrl=new AbortController();
+      const tid=setTimeout(()=>ctrl.abort(), 15000);
+      try{
+        const r=await fetch(BASE+path,{signal:ctrl.signal,cache:'no-store'});
+        clearTimeout(tid);
+        if(!r.ok){ const t=await r.text().catch(()=>''); throw new Error(`${r.status}: ${t.slice(0,120)||path}`); }
+        return await r.json();
+      }catch(e){
+        clearTimeout(tid);
+        lastErr=e.name==='AbortError'?new Error(`Timeout: ${path}`):e;
+        if(attempt<retries) await new Promise(r=>setTimeout(r,800*(attempt+1)));
+      }
     }
+    throw lastErr;
   });
 }
 
@@ -417,6 +419,7 @@ function resetStaleTimer(){
   if(S.isLive) _staleTimer=setTimeout(()=>$('stale-bar').classList.add('show'),STALE_MS);
 }
 function manualRefresh(){
+  S.sessStale=true; _sessFetchedAt=0;
   $('fab').classList.add('spin');
   loadAll().finally(()=>$('fab').classList.remove('spin'));
 }
@@ -475,33 +478,39 @@ function mostRecent(arr){
 
 async function findSession(){
   const now=Date.now();
-  if(S.session&&!S.sessStale&&(now-_sessFetchedAt)<(S.isLive?SESS_TTL:30000)) return S.session;
+  const cacheTTL=S.isLive?SESS_TTL:60000;
+  if(S.session&&!S.sessStale&&(now-_sessFetchedAt)<cacheTTL) return S.session;
   S.sessStale=false; _sessFetchedAt=now;
 
-  // Search up to 2 years back; prefer live session, then most-recent started session
-  let bestSess=null, bestAllSessions=[], bestYear=null;
+  // Strategy 1: session_key=latest — fastest path, always points to most recent session
+  try{
+    const latestArr=await apiFetch('/sessions?session_key=latest');
+    if(latestArr&&latestArr.length){
+      const sess=latestArr[0];
+      S.dataYear=sess.year||CURRENT_YEAR;
+      if(sess.meeting_key){
+        const allYr=await apiFetch(`/sessions?year=${sess.year||CURRENT_YEAR}`).catch(()=>[]);
+        S.meetingSessions=allYr.filter(s=>s.meeting_key===sess.meeting_key)
+          .sort((a,b)=>new Date(a.date_start)-new Date(b.date_start));
+      }
+      return sess;
+    }
+  }catch(e){ /* fall through to year-based search */ }
+
+  // Strategy 2: Search by year, newest first, no early exits
   for(let yr=CURRENT_YEAR; yr>=CURRENT_YEAR-2; yr--){
     const all=await apiFetch(`/sessions?year=${yr}`).catch(()=>[]);
     if(!all.length) continue;
     const candidate=mostRecent(all);
-    if(!candidate) continue;
-    // Always record this as fallback if we have nothing yet
-    if(!bestSess){ bestSess=candidate; bestAllSessions=all; bestYear=yr; }
-    // If we find a live session, use it immediately
-    if(isLiveSess(candidate)){ bestSess=candidate; bestAllSessions=all; bestYear=yr; break; }
-    // If current year returned sessions, stop looking further back (don't skip to older data)
-    if(yr===CURRENT_YEAR) break;
+    if(!candidate) continue; // year has sessions but none started yet — keep looking back
+    S.dataYear=yr;
+    if(candidate.meeting_key){
+      S.meetingSessions=all.filter(s=>s.meeting_key===candidate.meeting_key)
+        .sort((a,b)=>new Date(a.date_start)-new Date(b.date_start));
+    }
+    return candidate; // return the most recent started session found
   }
-
-  if(!bestSess) return null;
-  S.dataYear=bestYear;
-
-  if(bestSess.meeting_key){
-    S.meetingSessions=bestAllSessions
-      .filter(s=>s.meeting_key===bestSess.meeting_key)
-      .sort((a,b)=>new Date(a.date_start)-new Date(b.date_start));
-  }
-  return bestSess;
+  return null;
 }
 
 /* ═══ DNF DETECTION ═══════════════════════ */
