@@ -1259,6 +1259,8 @@ function renderPositionView(wrap, selected, driverLaps, sortedLaps){
   html+=`</div></div>`;
   wrap.innerHTML=html;
 }
+
+function renderWeather(){
   const wrap=$('sx-wx-wrap'),wx=S.weather;
   if(!wx){ wrap.innerHTML='<div class="smsg"><div class="ico">🌤️</div><h3>No weather data</h3><p>Weather available during active sessions</p></div>'; return; }
   const cond=wx.rainfall?'🌧️ WET':'☀️ DRY',condCol=wx.rainfall?'#1e90ff':'#00d27f';
