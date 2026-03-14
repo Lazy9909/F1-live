@@ -530,10 +530,22 @@ function computeStandings(){
     const fp=S.positions.find(p=>p.driver_number===S.fastestLap.driver_number);
     if(fp&&fp.position<=10) drvPts[fp.driver_number]++;
   }
-  S.drvStd=Object.entries(drvPts).map(([dn,pts])=>({dn:+dn,pts,d:S.drivers[+dn]||{}})).sort((a,b)=>b.pts-a.pts);
+  // Use numeric key to look up drivers — S.drivers is keyed by driver_number as number
+  S.drvStd=Object.entries(drvPts)
+    .map(([dn,pts])=>({dn:+dn,pts,d:S.drivers[+dn]||{}}))
+    .sort((a,b)=>b.pts-a.pts);
+
+  // Build team standings — only from drivers who have a valid team_name
   const teamPts={},teamCol={};
-  S.drvStd.forEach(({d,pts})=>{ const t=d.team_name||'—'; teamPts[t]=(teamPts[t]||0)+pts; if(d.team_colour) teamCol[t]='#'+d.team_colour; });
-  S.teamStd=Object.entries(teamPts).map(([name,pts])=>({name,pts,col:teamCol[name]||'#555'})).sort((a,b)=>b.pts-a.pts);
+  S.drvStd.forEach(({d,pts})=>{
+    const t=d.team_name;
+    if(!t||t==='—') return; // skip drivers with no team data
+    teamPts[t]=(teamPts[t]||0)+pts;
+    if(d.team_colour&&!teamCol[t]) teamCol[t]='#'+d.team_colour;
+  });
+  S.teamStd=Object.entries(teamPts)
+    .map(([name,pts])=>({name,pts,col:teamCol[name]||'#555'}))
+    .sort((a,b)=>b.pts-a.pts);
 }
 
 /* ═══ BOOT LOADER ═════════════════════════ */
@@ -678,8 +690,6 @@ async function loadAll(){
         }
         const cd=await apiFetch(`/championship_drivers?session_key=${raceSk}`).catch(()=>[]);
         if(cd.length) S.champDrivers=cd.sort((a,b)=>(a.position_current||99)-(b.position_current||99));
-        const ct=await apiFetch(`/championship_teams?session_key=${raceSk}`).catch(()=>[]);
-        if(ct.length) S.champTeams=ct.sort((a,b)=>(a.position_current||99)-(b.position_current||99));
       }
     }
 
@@ -790,23 +800,32 @@ function renderRaceBoard(){
 }
 
 function renderStandings(){
-  const drRef=n=>S.champDriversRef[String(n)]||S.drivers[n]||{};
-  const teamCol=name=>{
-    if(!name) return '#555';
-    const all=[...Object.values(S.champDriversRef),...Object.values(S.drivers)];
-    const d=all.find(d=>d.team_name===name)||all.find(d=>d.team_name&&(d.team_name.includes(name)||name.includes(d.team_name)));
-    return d?.team_colour?'#'+d.team_colour:'#555';
+  // drRef: look up driver by number — handle both string and numeric keys robustly
+  const drRef=n=>{
+    const key=String(n);
+    const num=+n;
+    return S.champDriversRef[key]||S.champDriversRef[num]||S.drivers[num]||S.drivers[key]||{};
   };
 
+  // ── Driver standings ──
   if(S.champDrivers.length){
     const sorted=S.champDrivers.slice().sort((a,b)=>(a.position_current||99)-(b.position_current||99));
     const maxD=sorted[0]?.points_current||1;
     let dh=`<div class="standings-wrap"><table class="st-table"><thead><tr><th>Pos</th><th></th><th>Driver</th><th>Team</th><th class="r">Pts</th></tr></thead><tbody>`;
     sorted.forEach(r=>{
       const pos=r.position_current,pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
-      const d=drRef(r.driver_number),col=d.team_colour?'#'+d.team_colour:'#555';
-      const pts=r.points_current||0,name=d.full_name||d.name_acronym||'#'+r.driver_number;
-      dh+=`<tr><td class="st-pos ${pcls}">${pos||'—'}</td><td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td><td><div class="st-name">${name}</div><div class="st-sub">${d.name_acronym||''}</div><div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxD*100)}%;background:${col}"></div></div></td><td><div class="st-sub" style="color:${col}">${d.team_name||'—'}</div></td><td class="r st-pts">${pts}</td></tr>`;
+      const d=drRef(r.driver_number);
+      const col=d.team_colour?'#'+d.team_colour:'#555';
+      const pts=r.points_current||0;
+      const name=d.full_name||d.name_acronym||'#'+r.driver_number;
+      const team=d.team_name||'—';
+      dh+=`<tr>
+        <td class="st-pos ${pcls}">${pos||'—'}</td>
+        <td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td>
+        <td><div class="st-name">${name}</div><div class="st-sub">${d.name_acronym||''}</div><div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxD*100)}%;background:${col}"></div></div></td>
+        <td><div class="st-sub" style="color:${col}">${team}</div></td>
+        <td class="r st-pts">${pts}</td>
+      </tr>`;
     });
     dh+=`</tbody></table><div class="st-note">Season championship standings</div></div>`;
     $('lb-drv-wrap').innerHTML=dh;
@@ -814,8 +833,15 @@ function renderStandings(){
     const maxD=S.drvStd[0]?.pts||1;
     let dh=`<div class="standings-wrap"><table class="st-table"><thead><tr><th>Pos</th><th></th><th>Driver</th><th>Team</th><th class="r">Pts</th></tr></thead><tbody>`;
     S.drvStd.forEach(({dn,pts,d},i)=>{
-      const pos=i+1,pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'',col=d.team_colour?'#'+d.team_colour:'#555';
-      dh+=`<tr><td class="st-pos ${pcls}">${pos}</td><td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td><td><div class="st-name">${d.full_name||'#'+dn}</div><div class="st-sub">${d.name_acronym||''}</div><div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxD*100)}%;background:${col}"></div></div></td><td><div class="st-sub" style="color:${col}">${d.team_name||'—'}</div></td><td class="r st-pts">${pts}</td></tr>`;
+      const pos=i+1,pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
+      const col=d.team_colour?'#'+d.team_colour:'#555';
+      dh+=`<tr>
+        <td class="st-pos ${pcls}">${pos}</td>
+        <td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td>
+        <td><div class="st-name">${d.full_name||'#'+dn}</div><div class="st-sub">${d.name_acronym||''}</div><div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxD*100)}%;background:${col}"></div></div></td>
+        <td><div class="st-sub" style="color:${col}">${d.team_name||'—'}</div></td>
+        <td class="r st-pts">${pts}</td>
+      </tr>`;
     });
     dh+=`</tbody></table><div class="st-note">Session points only · FL bonus applied where eligible</div></div>`;
     $('lb-drv-wrap').innerHTML=dh;
@@ -823,25 +849,50 @@ function renderStandings(){
     $('lb-drv-wrap').innerHTML='<div class="smsg"><div class="ico">👤</div><h3>No standings yet</h3></div>';
   }
 
-  if(S.champTeams.length){
-    const sorted=S.champTeams.slice().sort((a,b)=>(a.position_current||99)-(b.position_current||99));
-    const maxT=sorted[0]?.points_current||1;
-    let th=`<div class="standings-wrap"><table class="st-table"><thead><tr><th>Pos</th><th></th><th>Constructor</th><th class="r">Pts</th></tr></thead><tbody>`;
-    sorted.forEach(r=>{
-      const pos=r.position_current,pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
-      const col=teamCol(r.team_name),pts=r.points_current||0;
-      th+=`<tr><td class="st-pos ${pcls}">${pos||'—'}</td><td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td><td><div class="st-name">${r.team_name||'—'}</div><div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxT*100)}%;background:${col}"></div></div></td><td class="r st-pts">${pts}</td></tr>`;
+  // ── Team standings — always derived by summing driver points ──
+  // Build from champDrivers if available, otherwise fall back to drvStd
+  const teamMap={}; // { team_name: { pts, col } }
+
+  if(S.champDrivers.length){
+    // Sum championship points per team using the same drRef we already have
+    S.champDrivers.forEach(r=>{
+      const d=drRef(r.driver_number);
+      const name=d.team_name;
+      if(!name||name==='—') return;
+      const pts=r.points_current||0;
+      const col=d.team_colour?'#'+d.team_colour:'#555';
+      if(!teamMap[name]) teamMap[name]={pts:0,col};
+      teamMap[name].pts+=pts;
     });
-    th+=`</tbody></table><div class="st-note">Season championship standings</div></div>`;
-    $('lb-team-wrap').innerHTML=th;
-  } else if(S.teamStd.length){
-    const maxT=S.teamStd[0]?.pts||1;
+  } else if(S.drvStd.length){
+    // Fall back to session-computed standings
+    S.drvStd.forEach(({d,pts})=>{
+      const name=d.team_name;
+      if(!name||name==='—') return;
+      const col=d.team_colour?'#'+d.team_colour:'#555';
+      if(!teamMap[name]) teamMap[name]={pts:0,col};
+      teamMap[name].pts+=pts;
+    });
+  }
+
+  const teamRows=Object.entries(teamMap)
+    .map(([name,{pts,col}])=>({name,pts,col}))
+    .sort((a,b)=>b.pts-a.pts);
+
+  if(teamRows.length){
+    const maxT=teamRows[0].pts||1;
+    const note=S.champDrivers.length?'Season championship standings':'Constructor points from this session';
     let th=`<div class="standings-wrap"><table class="st-table"><thead><tr><th>Pos</th><th></th><th>Constructor</th><th class="r">Pts</th></tr></thead><tbody>`;
-    S.teamStd.forEach(({name,pts,col},i)=>{
+    teamRows.forEach(({name,pts,col},i)=>{
       const pos=i+1,pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
-      th+=`<tr><td class="st-pos ${pcls}">${pos}</td><td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td><td><div class="st-name">${name}</div><div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxT*100)}%;background:${col}"></div></div></td><td class="r st-pts">${pts}</td></tr>`;
+      th+=`<tr>
+        <td class="st-pos ${pcls}">${pos}</td>
+        <td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td>
+        <td><div class="st-name">${name}</div><div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxT*100)}%;background:${col}"></div></div></td>
+        <td class="r st-pts">${pts}</td>
+      </tr>`;
     });
-    th+=`</tbody></table><div class="st-note">Constructor points from this session</div></div>`;
+    th+=`</tbody></table><div class="st-note">${note}</div></div>`;
     $('lb-team-wrap').innerHTML=th;
   } else {
     $('lb-team-wrap').innerHTML='<div class="smsg"><div class="ico">🏭</div><h3>No standings yet</h3></div>';
