@@ -366,9 +366,18 @@ function _drain(){
 }
 async function apiFetch(path){
   return apiQ(async()=>{
-    const r=await fetch(BASE+path);
-    if(!r.ok){ const t=await r.text().catch(()=>''); throw new Error(`${r.status}: ${t.slice(0,80)||path}`); }
-    return r.json();
+    const ctrl=new AbortController();
+    const tid=setTimeout(()=>ctrl.abort(),8000); // 8s timeout per request
+    try{
+      const r=await fetch(BASE+path,{signal:ctrl.signal});
+      clearTimeout(tid);
+      if(!r.ok){ const t=await r.text().catch(()=>''); throw new Error(`${r.status}: ${t.slice(0,80)||path}`); }
+      return r.json();
+    }catch(e){
+      clearTimeout(tid);
+      if(e.name==='AbortError') throw new Error(`Timeout: ${path}`);
+      throw e;
+    }
   });
 }
 
@@ -570,6 +579,8 @@ function computeStandings(){
 
 /* ═══ BOOT LOADER ═════════════════════════ */
 async function bootLoad(){
+  // Reset rate limiter — prevents stale queue state from a previous load blocking boot
+  _rlQ=[]; _rlBusy=false; _rlLast=0;
   S.sessStale=true; _sessFetchedAt=0;
   showBootProgress('Finding latest session…',0);
   try{
@@ -633,8 +644,12 @@ async function bootLoad(){
     setTick(live?TICK_LIVE:TICK_IDLE);
   }catch(err){
     console.error('[boot]',err); hideBootProgress();
-    $('lb-race-wrap').innerHTML=`<div class="smsg"><div class="ico">⚠️</div><h3>Connection Error</h3><p style="font-size:11px;max-width:320px;margin:0 auto;word-break:break-word">${err.message}</p><p style="margin-top:8px;font-size:11px">Tap ↻ to retry</p></div>`;
+    $('lb-race-wrap').innerHTML=`<div class="smsg"><div class="ico">⚠️</div><h3>Could Not Load Data</h3>
+      <p style="font-size:11px;max-width:320px;margin:0 auto;word-break:break-word">${err.message}</p>
+      <p style="margin-top:12px;font-size:11px;color:var(--muted)">Retrying in 10s… or tap ↻</p></div>`;
     setStatus(false);
+    // Auto-retry after 10s so a transient network hiccup self-heals
+    setTimeout(()=>{ if(!S.positions.length) bootLoad().then(startTimers); }, 10000);
   }
 }
 
