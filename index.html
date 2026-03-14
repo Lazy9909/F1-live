@@ -322,7 +322,7 @@
     <div id="sc-wrap"><div class="smsg"><div class="ico">📅</div><h3>Loading calendar…</h3></div></div>
   </div>
 
-  <div class="fn">F1 Live Updates · Live 12s · Idle 2min (session+positions only) · OpenF1 API</div>
+  <div class="fn">F1 Live Updates · Live 12s · Idle 2min · OpenF1 API</div>
 </main>
 
 <button id="fab" title="Refresh now">
@@ -399,12 +399,15 @@ let _tickTimer=null,_curTick=0,_schedDone=false,_liveDone=false;
 let _lastRadioTs=null,_lastCtrlTs=null,_staleTimer=null;
 
 function purgeSession(){
+  /* Wipes all session data when a new session starts.
+     Live feed (radio, race control, lap notes) is kept until the
+     new session begins — purged here alongside timing data. */
   S.positions=[];S.intervals={};S.stints={};S.laps={};S.fastestLap=null;
   S.weather=null;S.lapCount=0;S.drvStd=[];S.teamStd=[];
   S.retiredDrivers=new Set();
   S.radioMsgs=[];S.ctrlMsgs=[];S.lapComments=[];
   _liveDone=false;_lastRadioTs=null;_lastCtrlTs=null;
-  _schedDone=false; // reset so calendar reloads if season changes
+  _schedDone=false;
   S.prevPositions={};S.posChanges=[];
 }
 
@@ -579,68 +582,24 @@ function computeStandings(){
 
 /* ═══ BOOT LOADER ═════════════════════════ */
 async function bootLoad(){
-  // Reset rate limiter — prevents stale queue state from a previous load blocking boot
+  // Reset rate limiter — prevents stale queue from blocking boot
   _rlQ=[]; _rlBusy=false; _rlLast=0;
   S.sessStale=true; _sessFetchedAt=0;
-  showBootProgress('Finding latest session…',0);
+  showBootProgress('Finding session…',0);
   try{
     const sess=await findSession();
     if(!sess) return showNoData();
     S.session=sess; S.sk=sess.session_key;
-    const live=isLiveSess(sess); setStatus(live); updateHeader(sess);
-    showBootProgress('Loading drivers…',14);
+    const live=isLiveSess(sess);
+    setStatus(live); updateHeader(sess);
+    showBootProgress('Loading…',30);
+    // Mark session as loaded so loadAll's session-change block doesn't re-purge
     purgeSession(); S.skLoaded=S.sk;
-    const drArr=await apiFetch(`/drivers?session_key=${S.sk}`).catch(()=>[]);
-    S.drivers={}; drArr.forEach(d=>{ S.drivers[d.driver_number]=d; });
-    showBootProgress('Loading positions…',28);
-
-    const posArr=await apiFetch(`/position?session_key=${S.sk}`).catch(()=>[]);
-    if(posArr.length){
-      const lp={}; posArr.forEach(p=>{ if(!lp[p.driver_number]||p.date>lp[p.driver_number].date) lp[p.driver_number]=p; });
-      S.positions=Object.values(lp).sort((a,b)=>a.position-b.position);
-      S.positions.forEach(p=>{ S.prevPositions[p.driver_number]=p.position; });
-    }
-    computeStandings(); renderRaceBoard(); renderStandings(); renderSessionInfo(sess); updateLapBar();
-    showBootProgress('Loading intervals…',42);
-    const bootRecent=isRecent(sess);
-
-    if(live){
-      const intArr=await apiFetch(`/intervals?session_key=${S.sk}`).catch(()=>[]);
-      const li={}; intArr.forEach(i=>{ if(!li[i.driver_number]||i.date>li[i.driver_number].date) li[i.driver_number]=i; }); S.intervals=li;
-    }
-    showBootProgress('Loading stints…',56);
-
-    if(bootRecent){
-      const stArr=await apiFetch(`/stints?session_key=${S.sk}`).catch(()=>[]);
-      if(stArr.length){ const ls={}; stArr.forEach(s=>{ if(!ls[s.driver_number]||s.stint_number>(ls[s.driver_number].stint_number||0)) ls[s.driver_number]=s; }); S.stints=ls; }
-    }
-    showBootProgress('Loading laps…',70);
-
-    if(bootRecent){
-      const lapArr=await apiFetch(`/laps?session_key=${S.sk}`).catch(()=>[]);
-      if(lapArr.length){
-        const ll={}; lapArr.forEach(l=>{ if(!ll[l.driver_number]||l.lap_number>(ll[l.driver_number].lap_number||0)) ll[l.driver_number]=l; }); S.laps=ll;
-        const valid=lapArr.filter(l=>+l.lap_duration>0);
-        S.fastestLap=valid.length?valid.reduce((a,b)=>+a.lap_duration<+b.lap_duration?a:b):null;
-        $('fltime').textContent=S.fastestLap?fmtLap(S.fastestLap.lap_duration):'—';
-        S.lapCount=Object.values(ll).reduce((m,l)=>Math.max(m,l.lap_number||0),0);
-        S.totalLaps=sess.total_laps||58;
-      }
-    }
-    updateLapBar();
-    showBootProgress('Loading weather…',84);
-
-    if(bootRecent){ const wxArr=await apiFetch(`/weather?session_key=${S.sk}`).catch(()=>[]); S.weather=wxArr.length?wxArr[wxArr.length-1]:null; }
-    showBootProgress('Loading calendar…',92);
-    if(!_schedDone){ _schedDone=true; loadSchedule(); }
-
-    detectRetirements(); computeStandings();
-    renderRaceBoard(); renderStandings(); renderSessionInfo(sess);
-    renderTimings(); renderWeather(); renderLiveFeed();
-    S.lastUpdated=new Date(); resetStaleTimer();
     showBootProgress('Ready',100);
-    await new Promise(r=>setTimeout(r,300));
+    await new Promise(r=>setTimeout(r,200));
     hideBootProgress();
+    // Hand off to loadAll — all data fetching uses the same "fetch if missing" gates
+    await loadAll();
     setTick(live?TICK_LIVE:TICK_IDLE);
   }catch(err){
     console.error('[boot]',err); hideBootProgress();
@@ -648,7 +607,6 @@ async function bootLoad(){
       <p style="font-size:11px;max-width:320px;margin:0 auto;word-break:break-word">${err.message}</p>
       <p style="margin-top:12px;font-size:11px;color:var(--muted)">Retrying in 10s… or tap ↻</p></div>`;
     setStatus(false);
-    // Auto-retry after 10s so a transient network hiccup self-heals
     setTimeout(()=>{ if(!S.positions.length) bootLoad().then(startTimers); }, 10000);
   }
 }
@@ -671,7 +629,7 @@ function hideBootProgress(){
 /* ═══ MAIN LOADER ═════════════════════════ */
 async function loadAll(){
   S.tickN++;
-  const slowTick=(S.tickN%SLOW_EVERY===0);
+  const slowTick=(S.tickN%SLOW_EVERY===0||S.tickN===1); // tick 1 = first call, treat as slow so all fields load
   try{
     const sess=await findSession(); if(!sess) return showNoData();
     S.session=sess; S.sk=sess.session_key;
@@ -680,8 +638,12 @@ async function loadAll(){
     setStatus(live); updateHeader(sess);
 
     if(S.skLoaded!==S.sk){
-      purgeSession(); S.skLoaded=S.sk;
-      S.sessStale=true; // force re-discovery next tick
+      purgeSession(); // wipes everything including live feed from old session
+      S.skLoaded=S.sk;
+      S.sessStale=true;
+    }
+    // Retry drivers if missing (e.g. failed on session change)
+    if(!Object.keys(S.drivers).length){
       const drArr=await apiFetch(`/drivers?session_key=${S.sk}`).catch(()=>[]);
       S.drivers={}; drArr.forEach(d=>{ S.drivers[d.driver_number]=d; });
     }
@@ -725,7 +687,7 @@ async function loadAll(){
     }
     updateLapBar();
 
-    // Stints — live/recent + slow tick
+    // Stints — slow tick, or immediately if we have none yet
     if(recent&&(slowTick||!Object.keys(S.stints).length)){
       const stArr=await apiFetch(`/stints?session_key=${S.sk}`).catch(()=>[]);
       if(stArr.length){ const ls={}; stArr.forEach(s=>{ if(!ls[s.driver_number]||s.stint_number>(ls[s.driver_number].stint_number||0)) ls[s.driver_number]=s; }); S.stints=ls; }
@@ -769,6 +731,10 @@ function renderRaceBoard(){
   }
   const sname=S.session?.session_name||'Session', mname=S.session?.meeting_name||'';
 
+  // Clear any loading placeholder (initial HTML stub) on first real render
+  const placeholder=wrap.querySelector('.smsg');
+  if(placeholder) placeholder.remove();
+
   // Patch or create banner
   let banner=wrap.querySelector('[data-banner]');
   const bannerKey=S.isLive?'live':'result';
@@ -800,8 +766,15 @@ function renderRaceBoard(){
 
     let gapHTML;
     if(pos===1) gapHTML='<span class="gap ldr">⬤ LEADER</span>';
-    else if(iv?.gap_to_leader!=null){ const g=iv.gap_to_leader; gapHTML=`<span class="gap">${typeof g==='string'?g:'+'+Number(g).toFixed(3)+'s'}</span>`; }
-    else gapHTML='<span class="gap" style="color:var(--muted)">—</span>';
+    else if(iv?.gap_to_leader!=null){
+      const g=iv.gap_to_leader;
+      gapHTML=`<span class="gap">${typeof g==='string'?g:'+'+Number(g).toFixed(3)+'s'}</span>`;
+    } else if(!S.isLive&&pos>1){
+      // Finished session — intervals not available. Show classified position.
+      gapHTML=`<span class="gap" style="color:var(--muted);font-size:11px">P${pos}</span>`;
+    } else {
+      gapHTML='<span class="gap" style="color:var(--muted)">—</span>';
+    }
 
     const lapHTML=lap?.lap_duration?`<span class="llap${isFl?' fl':''}">⏱ ${fmtLap(lap.lap_duration)}${isFl?' 🟣':''}</span>`:'';
     const extrasHTML=[tyreHTML(st?.compound),inPit?'<span class="pit-badge">PIT</span>':'',isRetired?'<span class="dnf-badge">DNF</span>':''].join('');
