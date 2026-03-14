@@ -719,13 +719,27 @@ async function loadAll(){
       if(sg.length) S.startingGrid=sg;
     }
 
-    // Championship standings — by year, slow tick, always (not just race sessions)
+    // Championship standings — requires a race session_key; use latest race in the year
     if(slowTick||!S.champDrivers.length){
-      const yr=S.dataYear||CURRENT_YEAR;
-      const cd=await apiFetch(`/championship_drivers?year=${yr}`).catch(()=>[]);
-      if(cd.length) S.champDrivers=cd.sort((a,b)=>a.position-b.position);
-      const ct=await apiFetch(`/championship_teams?year=${yr}`).catch(()=>[]);
-      if(ct.length) S.champTeams=ct.sort((a,b)=>a.position-b.position);
+      // Find the most recent completed race session_key for this year
+      let raceSk=isRace?S.sk:null;
+      if(!raceSk){
+        const yr=S.dataYear||CURRENT_YEAR;
+        const allSess=await apiFetch(`/sessions?year=${yr}&session_name=Race`).catch(()=>[]);
+        if(allSess.length){
+          const nowMs=Date.now();
+          const past=allSess.filter(s=>s.date_start&&new Date(s.date_start).getTime()<nowMs);
+          if(past.length) raceSk=past.sort((a,b)=>new Date(b.date_start)-new Date(a.date_start))[0].session_key;
+        }
+      }
+      if(raceSk){
+        const cd=await apiFetch(`/championship_drivers?session_key=${raceSk}`).catch(()=>[]);
+        if(cd.length){ S.champDrivers=cd.sort((a,b)=>(a.position_current||99)-(b.position_current||99)); console.log('[champ] drivers sample',JSON.stringify(cd[0])); }
+        else console.warn('[champ] championship_drivers returned empty for sk',raceSk);
+        const ct=await apiFetch(`/championship_teams?session_key=${raceSk}`).catch(()=>[]);
+        if(ct.length){ S.champTeams=ct.sort((a,b)=>(a.position_current||99)-(b.position_current||99)); console.log('[champ] teams sample',JSON.stringify(ct[0])); }
+        else console.warn('[champ] championship_teams returned empty for sk',raceSk);
+      } else console.warn('[champ] no race session_key found for championship fetch');
     }
 
     computeStandings();
@@ -850,13 +864,17 @@ function renderRaceBoard(){
 function renderStandings(){
   // Drivers — prefer season championship data, fall back to session points
   if(S.champDrivers.length){
-    const maxD=S.champDrivers[0]?.points||1;
+    // API fields: driver_number, points_current, position_current
+    const sorted=S.champDrivers.slice().sort((a,b)=>(a.position_current||99)-(b.position_current||99));
+    const maxD=sorted[0]?.points_current||1;
     let dh=`<div class="standings-wrap"><table class="st-table"><thead><tr><th>Pos</th><th></th><th>Driver</th><th>Team</th><th class="r">Pts</th></tr></thead><tbody>`;
-    S.champDrivers.forEach(r=>{
-      const pos=r.position,pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
-      const col=r.team_colour?'#'+r.team_colour:'#555';
-      const pts=r.points||0;
-      dh+=`<tr><td class="st-pos ${pcls}">${pos}</td><td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td><td><div class="st-name">${r.full_name||r.driver_number||'—'}</div><div class="st-sub">${r.name_acronym||''}</div><div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxD*100)}%;background:${col}"></div></div></td><td><div class="st-sub" style="color:${col}">${r.team_name||'—'}</div></td><td class="r st-pts">${pts}</td></tr>`;
+    sorted.forEach(r=>{
+      const pos=r.position_current,pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
+      const d=S.drivers[r.driver_number]||{};
+      const col=d.team_colour?'#'+d.team_colour:'#555';
+      const pts=r.points_current||0;
+      const name=d.full_name||d.name_acronym||'#'+r.driver_number;
+      dh+=`<tr><td class="st-pos ${pcls}">${pos||'—'}</td><td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td><td><div class="st-name">${name}</div><div class="st-sub">${d.name_acronym||''}</div><div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxD*100)}%;background:${col}"></div></div></td><td><div class="st-sub" style="color:${col}">${d.team_name||'—'}</div></td><td class="r st-pts">${pts}</td></tr>`;
     });
     dh+=`</tbody></table><div class="st-note">Season championship standings</div></div>`;
     $('lb-drv-wrap').innerHTML=dh;
@@ -874,13 +892,17 @@ function renderStandings(){
   }
   // Teams — prefer season championship data, fall back to session points
   if(S.champTeams.length){
-    const maxT=S.champTeams[0]?.points||1;
+    // API fields: team_name, points_current, position_current
+    const sorted=S.champTeams.slice().sort((a,b)=>(a.position_current||99)-(b.position_current||99));
+    const maxT=sorted[0]?.points_current||1;
     let th=`<div class="standings-wrap"><table class="st-table"><thead><tr><th>Pos</th><th></th><th>Constructor</th><th class="r">Pts</th></tr></thead><tbody>`;
-    S.champTeams.forEach(r=>{
-      const pos=r.position,pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
-      const col=r.team_colour?'#'+r.team_colour:'#555';
-      const pts=r.points||0;
-      th+=`<tr><td class="st-pos ${pcls}">${pos}</td><td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td><td><div class="st-name">${r.team_name||'—'}</div><div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxT*100)}%;background:${col}"></div></div></td><td class="r st-pts">${pts}</td></tr>`;
+    sorted.forEach(r=>{
+      const pos=r.position_current,pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
+      const col=r.team_colour?'#'+r.team_colour:
+        (Object.values(S.drivers).find(d=>d.team_name&&r.team_name&&d.team_name.toLowerCase()===r.team_name.toLowerCase())?.team_colour||null);
+      const colStr=col?(col.startsWith('#')?col:'#'+col):'#555';
+      const pts=r.points_current||0;
+      th+=`<tr><td class="st-pos ${pcls}">${pos||'—'}</td><td><div style="width:4px;height:24px;border-radius:2px;background:${colStr}"></div></td><td><div class="st-name">${r.team_name||'—'}</div><div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxT*100)}%;background:${colStr}"></div></div></td><td class="r st-pts">${pts}</td></tr>`;
     });
     th+=`</tbody></table><div class="st-note">Season championship standings</div></div>`;
     $('lb-team-wrap').innerHTML=th;
