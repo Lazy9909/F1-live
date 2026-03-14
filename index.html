@@ -395,7 +395,7 @@ const S={
   radioMsgs:[], ctrlMsgs:[], lapComments:[],
   prevPositions:{}, posChanges:[],
   sessionResult:[], startingGrid:[],
-  champDrivers:[], champTeams:[],
+  champDrivers:[], champTeams:[], champDriversRef:{},
 };
 let _tickTimer=null,_curTick=0,_schedDone=false,_liveDone=false;
 let _lastRadioTs=null,_lastCtrlTs=null,_lastCtrlSk=null,_staleTimer=null;
@@ -411,7 +411,7 @@ function purgeSession(){
   _liveDone=false;_lastRadioTs=null;_lastCtrlTs=null;_lastCtrlSk=null;
   _schedDone=false;
   S.prevPositions={};S.posChanges=[];
-  S.sessionResult=[];S.startingGrid=[];S.champDrivers=[];S.champTeams=[];
+  S.sessionResult=[];S.startingGrid=[];S.champDrivers=[];S.champTeams=[];S.champDriversRef={};
 }
 
 /* ═══ DOM HELPERS ═════════════════════════ */
@@ -761,11 +761,16 @@ async function loadAll(){
         }
       }
       if(raceSk){
+        // Also fetch drivers from the race session for name/colour lookup
+        if(!Object.keys(S.champDriversRef).length){
+          const rdrv=await apiFetch(`/drivers?session_key=${raceSk}`).catch(()=>[]);
+          rdrv.forEach(d=>{ S.champDriversRef[d.driver_number]=d; });
+        }
         const cd=await apiFetch(`/championship_drivers?session_key=${raceSk}`).catch(()=>[]);
-        if(cd.length){ S.champDrivers=cd.sort((a,b)=>(a.position_current||99)-(b.position_current||99)); console.log('[champ] drivers sample',JSON.stringify(cd[0])); }
+        if(cd.length) S.champDrivers=cd.sort((a,b)=>(a.position_current||99)-(b.position_current||99));
         else console.warn('[champ] championship_drivers returned empty for sk',raceSk);
         const ct=await apiFetch(`/championship_teams?session_key=${raceSk}`).catch(()=>[]);
-        if(ct.length){ S.champTeams=ct.sort((a,b)=>(a.position_current||99)-(b.position_current||99)); console.log('[champ] teams sample',JSON.stringify(ct[0])); }
+        if(ct.length) S.champTeams=ct.sort((a,b)=>(a.position_current||99)-(b.position_current||99));
         else console.warn('[champ] championship_teams returned empty for sk',raceSk);
       } else console.warn('[champ] no race session_key found for championship fetch');
     }
@@ -890,15 +895,22 @@ function renderRaceBoard(){
 }
 
 function renderStandings(){
+  // Helper: get driver info — prefer race-session ref, fall back to current session drivers
+  const drRef=n=>S.champDriversRef[n]||S.drivers[n]||{};
+  const teamCol=name=>{
+    const d=Object.values(S.champDriversRef).find(d=>d.team_name===name)||
+             Object.values(S.drivers).find(d=>d.team_name===name);
+    return d?.team_colour?'#'+d.team_colour:'#555';
+  };
+
   // Drivers — prefer season championship data, fall back to session points
   if(S.champDrivers.length){
-    // API fields: driver_number, points_current, position_current
     const sorted=S.champDrivers.slice().sort((a,b)=>(a.position_current||99)-(b.position_current||99));
     const maxD=sorted[0]?.points_current||1;
     let dh=`<div class="standings-wrap"><table class="st-table"><thead><tr><th>Pos</th><th></th><th>Driver</th><th>Team</th><th class="r">Pts</th></tr></thead><tbody>`;
     sorted.forEach(r=>{
       const pos=r.position_current,pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
-      const d=S.drivers[r.driver_number]||{};
+      const d=drRef(r.driver_number);
       const col=d.team_colour?'#'+d.team_colour:'#555';
       const pts=r.points_current||0;
       const name=d.full_name||d.name_acronym||'#'+r.driver_number;
@@ -920,17 +932,14 @@ function renderStandings(){
   }
   // Teams — prefer season championship data, fall back to session points
   if(S.champTeams.length){
-    // API fields: team_name, points_current, position_current
     const sorted=S.champTeams.slice().sort((a,b)=>(a.position_current||99)-(b.position_current||99));
     const maxT=sorted[0]?.points_current||1;
     let th=`<div class="standings-wrap"><table class="st-table"><thead><tr><th>Pos</th><th></th><th>Constructor</th><th class="r">Pts</th></tr></thead><tbody>`;
     sorted.forEach(r=>{
       const pos=r.position_current,pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
-      const col=r.team_colour?'#'+r.team_colour:
-        (Object.values(S.drivers).find(d=>d.team_name&&r.team_name&&d.team_name.toLowerCase()===r.team_name.toLowerCase())?.team_colour||null);
-      const colStr=col?(col.startsWith('#')?col:'#'+col):'#555';
+      const col=teamCol(r.team_name);
       const pts=r.points_current||0;
-      th+=`<tr><td class="st-pos ${pcls}">${pos||'—'}</td><td><div style="width:4px;height:24px;border-radius:2px;background:${colStr}"></div></td><td><div class="st-name">${r.team_name||'—'}</div><div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxT*100)}%;background:${colStr}"></div></div></td><td class="r st-pts">${pts}</td></tr>`;
+      th+=`<tr><td class="st-pos ${pcls}">${pos||'—'}</td><td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td><td><div class="st-name">${r.team_name||'—'}</div><div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxT*100)}%;background:${col}"></div></div></td><td class="r st-pts">${pts}</td></tr>`;
     });
     th+=`</tbody></table><div class="st-note">Season championship standings</div></div>`;
     $('lb-team-wrap').innerHTML=th;
