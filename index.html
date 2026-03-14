@@ -623,18 +623,25 @@ async function loadAll(){
       const li={}; intArr.forEach(i=>{ if(!li[i.driver_number]||i.date>li[i.driver_number].date) li[i.driver_number]=i; }); S.intervals=li;
     } else S.intervals={};
 
-    // Laps — always load; on live refresh every tick, on finished sessions only once
-    if(live||!Object.keys(S.laps).length){
-      const lapArr=await apiFetch(`/laps?session_key=${S.sk}`).catch(()=>[]);
-      if(lapArr.length){
-        S.allLaps=lapArr; // keep full array for Lap by Lap view
-        const ll={}; lapArr.forEach(l=>{ if(!ll[l.driver_number]||l.lap_number>(ll[l.driver_number].lap_number||0)) ll[l.driver_number]=l; }); S.laps=ll;
-        const valid=lapArr.filter(l=>+l.lap_duration>0);
-        S.fastestLap=valid.length?valid.reduce((a,b)=>+a.lap_duration<+b.lap_duration?a:b):null;
-        $('fltime').textContent=S.fastestLap?fmtLap(S.fastestLap.lap_duration):'—';
-        S.lapCount=Object.values(ll).reduce((m,l)=>Math.max(m,l.lap_number||0),0);
-        S.totalLaps=sess.total_laps||58;
-      }
+    // Laps — always reload (finished or live)
+    const lapArr=await apiFetch(`/laps?session_key=${S.sk}`).catch(()=>[]);
+    if(lapArr.length){
+      S.allLaps=lapArr; // full array for Lap by Lap view
+      // Keep only the latest lap object per driver (highest lap_number)
+      const ll={};
+      lapArr.forEach(l=>{
+        if(!ll[l.driver_number]||l.lap_number>(ll[l.driver_number].lap_number||0)) ll[l.driver_number]=l;
+      });
+      S.laps=ll;
+      const valid=lapArr.filter(l=>+l.lap_duration>0);
+      S.fastestLap=valid.length?valid.reduce((a,b)=>+a.lap_duration<+b.lap_duration?a:b):null;
+      $('fltime').textContent=S.fastestLap?fmtLap(S.fastestLap.lap_duration):'—';
+      // lapCount = highest lap number completed by the leader (max across all laps)
+      S.lapCount=lapArr.reduce((m,l)=>Math.max(m,l.lap_number||0),0);
+      // totalLaps = use session field if present, otherwise infer from completed laps
+      // For a finished race the max lap_number IS the total; for live use sess.total_laps as hint
+      const sessTotal=sess.total_laps&&+sess.total_laps>0?+sess.total_laps:0;
+      S.totalLaps=sessTotal||S.lapCount||58;
     }
     updateLapBar();
 
