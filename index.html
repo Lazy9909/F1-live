@@ -636,7 +636,7 @@ async function bootLoad(){
 
     detectRetirements(); computeStandings();
     renderRaceBoard(); renderStandings(); renderSessionInfo(sess);
-    renderTimings(); renderWeather();
+    renderTimings(); renderWeather(); renderLiveFeed();
     S.lastUpdated=new Date(); resetStaleTimer();
     showBootProgress('Ready',100);
     await new Promise(r=>setTimeout(r,300));
@@ -681,6 +681,7 @@ async function loadAll(){
 
     if(S.skLoaded!==S.sk){
       purgeSession(); S.skLoaded=S.sk;
+      S.sessStale=true; // force re-discovery next tick
       const drArr=await apiFetch(`/drivers?session_key=${S.sk}`).catch(()=>[]);
       S.drivers={}; drArr.forEach(d=>{ S.drivers[d.driver_number]=d; });
     }
@@ -710,7 +711,7 @@ async function loadAll(){
       const li={}; intArr.forEach(i=>{ if(!li[i.driver_number]||i.date>li[i.driver_number].date) li[i.driver_number]=i; }); S.intervals=li;
     } else S.intervals={};
 
-    // Laps — live + recently-finished
+    // Laps — every tick when recent (lap times update each lap)
     if(recent){
       const lapArr=await apiFetch(`/laps?session_key=${S.sk}`).catch(()=>[]);
       if(lapArr.length){
@@ -740,7 +741,7 @@ async function loadAll(){
 
     detectRetirements(); computeStandings();
     renderRaceBoard(); renderStandings(); renderSessionInfo(sess);
-    renderTimings(); renderWeather();
+    renderTimings(); renderWeather(); renderLiveFeed();
     S.lastUpdated=new Date(); resetStaleTimer();
 
     if(!_schedDone){ _schedDone=true; loadSchedule(); }
