@@ -1,60 +1,63 @@
 /* ─────────────────────────────────────────────────────────────────
    F1 Live Updates — Service Worker v2
-   Strategy:
-     • App shell (HTML, manifest, icons) → cache-first + offline fallback
-     • API calls (openf1.org, anthropic.com, fonts) → network-only
-     • Offline: serve the cached shell; show offline message if uncached
+   · Cache-first for app shell (HTML, manifest, icons)
+   · Network-only for all API / font calls
+   · Offline fallback page for navigation requests
 ───────────────────────────────────────────────────────────────── */
-const CACHE   = 'f1-live-v2';
-const SHELL   = [
-  './',
-  './index.html',
-  './manifest.json',
-  './icon-192.png',
-  './icon-512.png',
-];
+const CACHE = 'f1-live-v2';
 
-/* Inline offline fallback — shown when app shell isn't cached yet */
+/* Core shell — must exist. Icons are optional (may not be deployed). */
+const SHELL_REQUIRED = ['./', './index.html', './manifest.json'];
+const SHELL_OPTIONAL = ['./icon-192.png', './icon-512.png'];
+
 const OFFLINE_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<meta name="theme-color" content="#0a0a0a"/>
-<title>F1 Live — Offline</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:system-ui,sans-serif;background:#0a0a0a;color:#f0f0f0;
-    min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;}
-  .wrap{max-width:320px;}
-  .icon{font-size:56px;margin-bottom:20px;}
-  h1{font-size:26px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#e10600;margin-bottom:8px;}
-  p{font-size:14px;color:#666;line-height:1.6;margin-bottom:20px;}
-  button{background:#e10600;border:none;color:#fff;font-size:14px;font-weight:700;
-    padding:12px 28px;border-radius:6px;cursor:pointer;letter-spacing:.5px;text-transform:uppercase;}
-  button:active{opacity:.85;}
-</style>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <meta name="theme-color" content="#0a0a0a"/>
+  <title>F1 Live Updates — Offline</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:system-ui,sans-serif;background:#0a0a0a;color:#f0f0f0;
+      min-height:100vh;display:flex;flex-direction:column;align-items:center;
+      justify-content:center;padding:24px;text-align:center;}
+    .logo{font-size:28px;font-weight:900;letter-spacing:2px;color:#e10600;
+      text-transform:uppercase;margin-bottom:4px;}
+    .logo span{color:#f0f0f0;}
+    .ico{font-size:52px;margin:28px 0 16px;}
+    h2{font-size:22px;font-weight:700;letter-spacing:.5px;margin-bottom:8px;}
+    p{font-size:14px;color:#666;line-height:1.6;max-width:300px;}
+    button{margin-top:28px;background:#e10600;color:#fff;border:none;
+      border-radius:8px;padding:12px 28px;font-size:15px;font-weight:700;
+      letter-spacing:.5px;cursor:pointer;text-transform:uppercase;}
+    button:active{opacity:.85;}
+  </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="icon">📡</div>
-  <h1>No Connection</h1>
-  <p>F1 Live Updates needs an internet connection to fetch race data. Check your connection and try again.</p>
+  <div class="logo">F1 <span>Live Updates</span></div>
+  <div class="ico">📡</div>
+  <h2>You're Offline</h2>
+  <p>No internet connection detected. Connect to a network to get live race data, timings and team radio.</p>
   <button onclick="location.reload()">Try Again</button>
-</div>
 </body>
 </html>`;
 
-/* ── Install — pre-cache the app shell ── */
+/* ── Install: cache required shell, attempt optional files individually ── */
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE)
-      .then(c => c.addAll(SHELL).catch(() => {})) // non-fatal if some assets missing
-      .then(() => self.skipWaiting())
+    caches.open(CACHE).then(async c => {
+      /* Required files — if any fail, install fails (intentional) */
+      await c.addAll(SHELL_REQUIRED);
+      /* Optional files — cache if available, silently skip if missing */
+      await Promise.all(
+        SHELL_OPTIONAL.map(url => c.add(url).catch(() => {}))
+      );
+    }).then(() => self.skipWaiting())
   );
 });
 
-/* ── Activate — delete stale caches ── */
+/* ── Activate: delete old caches ── */
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
@@ -63,38 +66,32 @@ self.addEventListener('activate', e => {
   );
 });
 
-/* ── Fetch ── */
+/* ── Fetch: network-only for APIs, cache-first for shell ── */
 self.addEventListener('fetch', e => {
   const url = e.request.url;
 
-  /* Network-only: live data endpoints — never serve stale responses */
+  /* Always network-only — never cache live data or external resources */
   if(
     url.includes('openf1.org') ||
     url.includes('anthropic.com') ||
-    url.includes('fonts.googleapis.com') ||
-    url.includes('fonts.gstatic.com')
-  ){
-    return; // let the browser handle normally; no caching
+    url.includes('fonts.googleapis') ||
+    url.includes('fonts.gstatic')
+  ) return;
+
+  /* Navigation requests: cache-first, offline fallback */
+  if(e.request.mode === 'navigate'){
+    e.respondWith(
+      caches.match(e.request)
+        .then(cached => cached || fetch(e.request))
+        .catch(() => new Response(OFFLINE_HTML, {
+          headers: { 'Content-Type': 'text/html; charset=utf-8' }
+        }))
+    );
+    return;
   }
 
-  /* App shell: cache-first, fall back to network, then offline page */
+  /* Sub-resources: cache-first, network fallback */
   e.respondWith(
-    caches.match(e.request).then(cached => {
-      if(cached) return cached;
-      return fetch(e.request).then(resp => {
-        /* Cache successful GET responses for the shell */
-        if(resp && resp.status === 200 && e.request.method === 'GET'){
-          const copy = resp.clone();
-          caches.open(CACHE).then(c => c.put(e.request, copy));
-        }
-        return resp;
-      }).catch(() => {
-        /* Offline — return the inline fallback page for navigation requests */
-        if(e.request.mode === 'navigate'){
-          return new Response(OFFLINE_HTML, { headers:{ 'Content-Type':'text/html' } });
-        }
-        return new Response('', { status: 503 });
-      });
-    })
+    caches.match(e.request).then(cached => cached || fetch(e.request))
   );
 });
