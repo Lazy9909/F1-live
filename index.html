@@ -118,7 +118,7 @@
     .icard{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 13px;}
     .ilbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;}
     .ival{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;margin-top:2px;}
-    .ival.green{color:var(--green);}.ival.red{color:var(--red);}.ival.purple{color:var(--purple);}
+    .ival.green{color:var(--green);}.ival.red{color:var(--red);}.ival.purple{color:var(--purple);}.ival.orange{color:var(--orange);}
 
     /* Lap by Lap */
     .lbl-wrap{padding:0 0 80px;}
@@ -356,21 +356,21 @@ const S={
   retiredDrivers:new Set(),
   weather:null,
   lapCount:0, totalLaps:58,
-  drvStd:[], teamStd:[],
+  drvStd:[],
   isLive:false, lastUpdated:null, dataYear:null,
   tickN:0, meetingSessions:[],
   sessionResult:[], startingGrid:[],
-  champDrivers:[], champTeams:[], champDriversRef:{},
+  champDrivers:[], champDriversRef:{},
 };
 let _tickTimer=null, _curTick=0, _schedDone=false, _staleTimer=null;
 
 function purgeSession(){
   S.positions=[];S.allPositions=[];S.intervals={};S.stints={};S.laps={};S.allLaps=[];S.fastestLap=null;
-  S.weather=null;S.lapCount=0;S.drvStd=[];S.teamStd=[];
+  S.weather=null;S.lapCount=0;S.drvStd=[];
   S.retiredDrivers=new Set();
   _schedDone=false;
-  _lblSelectedDrivers=new Set(); // reset driver filter on session change
-  S.sessionResult=[];S.startingGrid=[];S.champDrivers=[];S.champTeams=[];S.champDriversRef={};
+  _lblSelectedDrivers=new Set();
+  S.sessionResult=[];S.startingGrid=[];S.champDrivers=[];S.champDriversRef={};
 }
 
 /* ═══ DOM HELPERS ═════════════════════════ */
@@ -396,16 +396,7 @@ function isLiveSess(sess){
   if(end) return now<end;
   return (now-start)<3*3600000;
 }
-function isRecent(sess){
-  if(!sess) return false;
-  const now=Date.now();
-  const start=sess.date_start?new Date(sess.date_start).getTime():0;
-  const end=sess.date_end?new Date(sess.date_end).getTime():0;
-  if(!start||start>now) return false;
-  // Consider a session "recent" for 72 hours after it ends (handles off-season browsing)
-  if(end) return (now-end)<72*3600000;
-  return (now-start)<6*3600000;
-}
+
 function tyreHTML(c){
   if(!c) return '';
   const map={SOFT:'S',MEDIUM:'M',HARD:'H',INTERMEDIATE:'I',WET:'W'};
@@ -468,7 +459,7 @@ function updateLapBar(){
 
 /* ═══ SESSION DISCOVERY ═══════════════════ */
 let _sessFetchedAt=0;
-const SESS_TTL     = 3*60*1000;  // 3 min cache for live; 30s for non-live (handled inline)
+const SESS_TTL=3*60*1000;
 
 function mostRecent(arr){
   const nowMs=Date.now();
@@ -483,7 +474,7 @@ async function findSession(){
   if(S.session&&!S.sessStale&&(now-_sessFetchedAt)<cacheTTL) return S.session;
   S.sessStale=false; _sessFetchedAt=now;
 
-  // Strategy 1: session_key=latest — fastest path, always points to most recent session
+  // Strategy 1: session_key=latest
   try{
     const latestArr=await apiFetch('/sessions?session_key=latest');
     if(latestArr&&latestArr.length){
@@ -496,20 +487,20 @@ async function findSession(){
       }
       return sess;
     }
-  }catch(e){ /* fall through to year-based search */ }
+  }catch(e){}
 
-  // Strategy 2: Search by year, newest first, no early exits
+  // Strategy 2: search by year
   for(let yr=CURRENT_YEAR; yr>=CURRENT_YEAR-2; yr--){
     const all=await apiFetch(`/sessions?year=${yr}`).catch(()=>[]);
     if(!all.length) continue;
     const candidate=mostRecent(all);
-    if(!candidate) continue; // year has sessions but none started yet — keep looking back
+    if(!candidate) continue;
     S.dataYear=yr;
     if(candidate.meeting_key){
       S.meetingSessions=all.filter(s=>s.meeting_key===candidate.meeting_key)
         .sort((a,b)=>new Date(a.date_start)-new Date(b.date_start));
     }
-    return candidate; // return the most recent started session found
+    return candidate;
   }
   return null;
 }
@@ -531,21 +522,8 @@ function computeStandings(){
     const fp=S.positions.find(p=>p.driver_number===S.fastestLap.driver_number);
     if(fp&&fp.position<=10) drvPts[fp.driver_number]++;
   }
-  // Use numeric key to look up drivers — S.drivers is keyed by driver_number as number
   S.drvStd=Object.entries(drvPts)
     .map(([dn,pts])=>({dn:+dn,pts,d:S.drivers[+dn]||{}}))
-    .sort((a,b)=>b.pts-a.pts);
-
-  // Build team standings — only from drivers who have a valid team_name
-  const teamPts={},teamCol={};
-  S.drvStd.forEach(({d,pts})=>{
-    const t=d.team_name;
-    if(!t||t==='—') return; // skip drivers with no team data
-    teamPts[t]=(teamPts[t]||0)+pts;
-    if(d.team_colour&&!teamCol[t]) teamCol[t]='#'+d.team_colour;
-  });
-  S.teamStd=Object.entries(teamPts)
-    .map(([name,pts])=>({name,pts,col:teamCol[name]||'#555'}))
     .sort((a,b)=>b.pts-a.pts);
 }
 
@@ -613,7 +591,7 @@ async function loadAll(){
     // Positions — always fetch (not just live)
     const posArr=await apiFetch(`/position?session_key=${S.sk}`).catch(()=>[]);
     if(posArr.length){
-      S.allPositions=posArr; // full history for lap-by-lap position view
+      S.allPositions=posArr;
       const lp={};
       posArr.forEach(p=>{ if(!lp[p.driver_number]||p.date>lp[p.driver_number].date) lp[p.driver_number]=p; });
       S.positions=Object.values(lp).sort((a,b)=>a.position-b.position);
@@ -628,8 +606,7 @@ async function loadAll(){
     // Laps — always reload (finished or live)
     const lapArr=await apiFetch(`/laps?session_key=${S.sk}`).catch(()=>[]);
     if(lapArr.length){
-      S.allLaps=lapArr; // full array for Lap by Lap view
-      // Keep only the latest lap object per driver (highest lap_number)
+      S.allLaps=lapArr;
       const ll={};
       lapArr.forEach(l=>{
         if(!ll[l.driver_number]||l.lap_number>(ll[l.driver_number].lap_number||0)) ll[l.driver_number]=l;
@@ -638,10 +615,7 @@ async function loadAll(){
       const valid=lapArr.filter(l=>+l.lap_duration>0);
       S.fastestLap=valid.length?valid.reduce((a,b)=>+a.lap_duration<+b.lap_duration?a:b):null;
       $('fltime').textContent=S.fastestLap?fmtLap(S.fastestLap.lap_duration):'—';
-      // lapCount = highest lap number completed by the leader (max across all laps)
       S.lapCount=lapArr.reduce((m,l)=>Math.max(m,l.lap_number||0),0);
-      // totalLaps = use session field if present, otherwise infer from completed laps
-      // For a finished race the max lap_number IS the total; for live use sess.total_laps as hint
       const sessTotal=sess.total_laps&&+sess.total_laps>0?+sess.total_laps:0;
       S.totalLaps=sessTotal||S.lapCount||58;
     }
@@ -673,19 +647,17 @@ async function loadAll(){
       if(sg.length) S.startingGrid=sg;
     }
 
-    // Championship standings — try to find most recent Race session
+    // Championship standings
     if(slowTick||!S.champDrivers.length){
       let raceSk=isRace?S.sk:null;
       if(!raceSk){
         const yr=S.dataYear||CURRENT_YEAR;
-        // Try with session_name filter first, fall back to all sessions
         let allSess=await apiFetch(`/sessions?year=${yr}&session_name=Race`).catch(()=>[]);
         if(!allSess.length) allSess=await apiFetch(`/sessions?year=${yr}`).catch(()=>[]);
         if(allSess.length){
           const nowMs2=Date.now();
           const past=allSess.filter(s=>s.date_start&&new Date(s.date_start).getTime()<nowMs2&&(s.session_name||'').match(/race|grand prix/i));
           if(past.length) raceSk=past.sort((a,b)=>new Date(b.date_start)-new Date(a.date_start))[0].session_key;
-          // If still nothing, grab the most recent started session key
           if(!raceSk){
             const anyPast=allSess.filter(s=>s.date_start&&new Date(s.date_start).getTime()<nowMs2);
             if(anyPast.length) raceSk=anyPast.sort((a,b)=>new Date(b.date_start)-new Date(a.date_start))[0].session_key;
@@ -908,12 +880,85 @@ function renderStandings(){
   }
 }
 
+/* ═══ CIRCUIT LENGTHS (km) ════════════════ */
+const CIRCUIT_LENGTHS={
+  'albert_park':5.278,'bahrain':5.412,'jeddah':6.174,'shanghai':5.451,
+  'miami':5.412,'imola':4.909,'monaco':3.337,'montreal':4.361,
+  'barcelona':4.657,'spielberg':4.318,'silverstone':5.891,'hungaroring':4.381,
+  'spa':7.004,'zandvoort':4.259,'monza':5.793,'baku':6.003,
+  'singapore':4.94,'suzuka':5.807,'lusail':5.38,'austin':5.513,
+  'mexico_city':4.304,'interlagos':4.309,'las_vegas':6.12,'yas_marina':5.281,
+  'sakhir':5.412, // alt key for bahrain
+};
+function getTrackLength(s){
+  if(!s||typeof s!=='object') return null;
+  const raw=s.circuit_key||s.circuit_short_name||s.location||'';
+  if(typeof raw!=='string') return null;
+  const key=raw.toLowerCase().replace(/\s+/g,'_');
+  if(CIRCUIT_LENGTHS[key]) return CIRCUIT_LENGTHS[key];
+  for(const [k,v] of Object.entries(CIRCUIT_LENGTHS)){
+    if(key.includes(k)||k.includes(key)) return v;
+  }
+  return null;
+}
+function countPitStops(){
+  // Sum up all stint pit_in events (stint_number > 1 means at least one pit happened)
+  // Each driver's current stint number tells us how many stops they've had (stints - 1)
+  let total=0;
+  Object.values(S.stints).forEach(st=>{ if(st.stint_number>1) total+=(st.stint_number-1); });
+  // Also count from allLaps: is_pit_out_lap true = pit occurred
+  const pitLaps=new Set();
+  (S.allLaps||[]).forEach(l=>{ if(l.is_pit_out_lap) pitLaps.add(`${l.driver_number}-${l.lap_number}`); });
+  // Use whichever is larger (stints are more reliable when available)
+  return Math.max(total, pitLaps.size);
+}
+/* ═══ 2026 F1 CALENDAR (hardcoded) ════════ */
+// Round lookup by country_name or circuit_short_name from OpenF1 session data
+const F1_2026_ROUNDS=[
+  {round:1,  name:'Australia',      keys:['australia','albert park','melbourne']},
+  {round:2,  name:'China',          keys:['china','shanghai']},
+  {round:3,  name:'Japan',          keys:['japan','suzuka']},
+  {round:4,  name:'Bahrain',        keys:['bahrain','sakhir']},
+  {round:5,  name:'Saudi Arabia',   keys:['saudi','jeddah']},
+  {round:6,  name:'Miami',          keys:['miami']},
+  {round:7,  name:'Canada',         keys:['canada','montreal','villeneuve']},
+  {round:8,  name:'Monaco',         keys:['monaco','monte carlo']},
+  {round:9,  name:'Barcelona-Catalunya', keys:['barcelona','catalunya']},
+  {round:10, name:'Austria',        keys:['austria','spielberg','red bull ring']},
+  {round:11, name:'Great Britain',  keys:['great britain','silverstone','britain']},
+  {round:12, name:'Belgium',        keys:['belgium','spa']},
+  {round:13, name:'Hungary',        keys:['hungary','hungaroring']},
+  {round:14, name:'Netherlands',    keys:['netherlands','zandvoort']},
+  {round:15, name:'Italy',          keys:['italy','monza']},
+  {round:16, name:'Spain',          keys:['spain','madrid','madring']},
+  {round:17, name:'Azerbaijan',     keys:['azerbaijan','baku']},
+  {round:18, name:'Singapore',      keys:['singapore']},
+  {round:19, name:'United States',  keys:['united states','austin','cota']},
+  {round:20, name:'Mexico',         keys:['mexico']},
+  {round:21, name:'Brazil',         keys:['brazil','interlagos','são paulo','sao paulo']},
+  {round:22, name:'Las Vegas',      keys:['las vegas']},
+  {round:23, name:'Qatar',          keys:['qatar','lusail']},
+  {round:24, name:'Abu Dhabi',      keys:['abu dhabi','yas marina']},
+];
+const F1_2026_TOTAL=24;
+
+function getRoundInfo(s){
+  if(!s||typeof s!=='object') return null;
+  const haystack=[s.country_name,s.circuit_short_name,s.location,s.meeting_name]
+    .map(v=>(typeof v==='string'?v:'')).join(' ').toLowerCase();
+  for(const r of F1_2026_ROUNDS){
+    if(r.keys.some(k=>haystack.includes(k))) return r;
+  }
+  return null;
+}
+
 function renderSessionInfo(s){
+  if(!s||typeof s!=='object'){ console.error('[renderSessionInfo] invalid session:', s); return; }
   const live=isLiveSess(s);
   const ds=s.date_start?new Date(s.date_start).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'—';
   const nowMs=Date.now();
-  const upcoming=S.meetingSessions.filter(ms=>ms.session_key!==s.session_key&&new Date(ms.date_start).getTime()>nowMs);
-  const nextSess=upcoming[0]||null;
+  const nextSess=S.meetingSessions.filter(ms=>ms.session_key!==s.session_key&&new Date(ms.date_start).getTime()>nowMs)[0]||null;
+
   let nextHTML='';
   if(nextSess){
     const ns=new Date(nextSess.date_start),diff=ns.getTime()-nowMs;
@@ -921,7 +966,42 @@ function renderSessionInfo(s){
     const countdown=h>0?`${h}h ${m}m`:`${m}m`;
     nextHTML=`<div style="padding:0 12px 10px"><div class="icard" style="border-color:var(--red);background:rgba(225,6,0,.04)"><div class="ilbl" style="color:var(--red)">▶ Next Session</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px">${nextSess.session_name}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${ns.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})} · ${ns.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})} local</div></div><div style="text-align:right"><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;color:var(--red)">${countdown}</div><div style="font-size:10px;color:var(--muted)">away</div></div></div></div></div>`;
   }
-  $('sx-info-wrap').innerHTML=`${nextHTML}<div class="igrid"><div class="icard"><div class="ilbl">Session</div><div class="ival" style="font-size:16px">${s.session_name||'—'}</div></div><div class="icard"><div class="ilbl">Status</div><div class="ival ${live?'green':''}">${live?'LIVE':'FINISHED'}</div></div><div class="icard"><div class="ilbl">Circuit</div><div class="ival" style="font-size:15px">${s.circuit_short_name||'—'}</div></div><div class="icard"><div class="ilbl">Country</div><div class="ival" style="font-size:15px">${s.country_name||'—'}</div></div><div class="icard"><div class="ilbl">Lap</div><div class="ival red">${S.lapCount||'—'}<span style="font-size:13px;color:var(--muted)"> / ${S.totalLaps}</span></div></div><div class="icard"><div class="ilbl">Fastest Lap</div><div class="ival purple" style="font-size:14px">${fmtLap(S.fastestLap?.lap_duration)}</div></div></div><div style="padding:0 12px 10px"><div class="icard"><div class="ilbl">Date</div><div style="font-size:13px;margin-top:4px">${ds}</div></div></div><div style="padding:0 12px 10px"><div class="icard"><div class="ilbl">Last Updated</div><div style="font-size:12px;margin-top:4px;color:var(--muted)">${S.lastUpdated?S.lastUpdated.toLocaleTimeString():'—'}</div></div></div>`;
+
+  const trackLen=getTrackLength(s);
+  const trackLenHTML=trackLen!=null?`${trackLen}<span style="font-size:13px;color:var(--muted)"> km</span>`:'—';
+
+  const flDriver=S.fastestLap?S.drivers[S.fastestLap.driver_number]:null;
+  const flAcronym=flDriver?.name_acronym||(S.fastestLap?'#'+S.fastestLap.driver_number:null);
+  const flCol=flDriver?.team_colour?'#'+flDriver.team_colour:'var(--purple)';
+  const flHTML=S.fastestLap
+    ?`<div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:${flCol};margin-top:2px">${flAcronym}</div><div style="font-size:13px;color:var(--purple);margin-top:1px">${fmtLap(S.fastestLap.lap_duration)}</div>`
+    :'<div class="ival purple" style="font-size:14px">—</div>';
+
+  const pitCount=countPitStops();
+  const pitHTML=pitCount>0?`${pitCount}<span style="font-size:13px;color:var(--muted)"> stops</span>`:'—';
+
+  const roundInfo=getRoundInfo(s);
+  const roundHTML=roundInfo?`${roundInfo.round}<span style="font-size:13px;color:var(--muted)"> / ${F1_2026_TOTAL}</span>`:'—';
+
+  const startTime=s.date_start?new Date(s.date_start).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'—';
+  const endTime=s.date_end?new Date(s.date_end).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'—';
+  const timeHTML=`${startTime}<span style="font-size:12px;color:var(--muted)"> → ${endTime}</span>`;
+
+  $('sx-info-wrap').innerHTML=`${nextHTML}
+<div class="igrid">
+  <div class="icard"><div class="ilbl">Session</div><div class="ival" style="font-size:16px">${s.session_name||'—'}</div></div>
+  <div class="icard"><div class="ilbl">Status</div><div class="ival ${live?'green':''}">${live?'LIVE':'FINISHED'}</div></div>
+  <div class="icard"><div class="ilbl">Circuit</div><div class="ival" style="font-size:15px">${s.circuit_short_name||'—'}</div></div>
+  <div class="icard"><div class="ilbl">Country</div><div class="ival" style="font-size:15px">${s.country_name||'—'}</div></div>
+  <div class="icard"><div class="ilbl">Lap</div><div class="ival red">${S.lapCount||'—'}<span style="font-size:13px;color:var(--muted)"> / ${S.totalLaps}</span></div></div>
+  <div class="icard"><div class="ilbl">Track Length</div><div class="ival green" style="font-size:18px">${trackLenHTML}</div></div>
+  <div class="icard" style="grid-column:span 2"><div class="ilbl">Fastest Lap</div>${flHTML}</div>
+  <div class="icard"><div class="ilbl">Pit Stops</div><div class="ival orange" style="font-size:18px">${pitHTML}</div></div>
+  <div class="icard"><div class="ilbl">Round</div><div class="ival" style="font-size:16px">${roundHTML}</div></div>
+</div>
+<div style="padding:0 12px 10px"><div class="icard"><div class="ilbl">Date</div><div style="font-size:13px;margin-top:4px">${ds}</div></div></div>
+<div style="padding:0 12px 10px"><div class="icard"><div class="ilbl">Session Time</div><div style="font-size:13px;margin-top:4px">${timeHTML}</div></div></div>
+<div style="padding:0 12px 10px"><div class="icard"><div class="ilbl">Last Updated</div><div style="font-size:12px;margin-top:4px;color:var(--muted)">${S.lastUpdated?S.lastUpdated.toLocaleTimeString():'—'}</div></div></div>`;
   renderWeekend();
 }
 
