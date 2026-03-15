@@ -329,7 +329,7 @@
   <div class="pane on" id="p-lb">
     <div class="subtabwrap">
       <div class="subtabs">
-        <button class="subtab on" data-s="lb-race">Race</button>
+        <button class="subtab on" data-s="lb-race">Races</button>
         <button class="subtab"    data-s="lb-drv">Drivers</button>
         <button class="subtab"    data-s="lb-team">Teams</button>
         <button class="subtab"    data-s="lb-sess">Sessions</button>
@@ -337,7 +337,7 @@
       </div>
     </div>
     <div class="subpane on" id="sp-lb-race"><div id="lb-race-wrap">
-      <div class="smsg"><div class="ico">🏎️</div><h3>Loading race data…</h3><p>Fetching from OpenF1 API</p></div>
+      <div class="smsg"><div class="ico">🏎️</div><h3>Loading season races…</h3><p>Fetching from OpenF1</p></div>
     </div></div>
     <div class="subpane" id="sp-lb-drv"><div id="lb-drv-wrap">
       <div class="smsg"><div class="ico">👤</div><h3>Driver Standings</h3><p>Loads with race data</p></div>
@@ -497,6 +497,7 @@ const S={
   lastUpdated:null, dataYear:null, selectedYear:null,
   tickN:0, meetingSessions:[],
   sessionResult:[], startingGrid:[], qualiResults:[], sprintResult:[], allYearSessions:[],
+  champDrivers:[], champTeams:[], champSk:null,
 };
 let _tickTimer=null, _curTick=0, _schedDone=false;
 
@@ -506,7 +507,7 @@ function purgeSession(){
   S.meetingSessions=[];
   _schedDone=false;
   _lblSelectedDrivers=new Set();
-  S.sessionResult=[];S.startingGrid=[];S.qualiResults=[];S.sprintResult=[];S.allYearSessions=[];
+  S.sessionResult=[];S.startingGrid=[];S.qualiResults=[];S.sprintResult=[];
 }
 
 /* ═══ DOM HELPERS ═════════════════════════ */
@@ -787,7 +788,7 @@ async function loadAll(){
     }
     // Fetch quali + sprint for this meeting (fire-and-forget, non-blocking)
     if(slowTick||!S.qualiResults.length) loadQualiAndSprint(S.sk, sess.meeting_key).catch(()=>{});
-    renderRaceBoard(); renderStandings(); renderQuali(); renderSessionInfo(sess); renderSessionSelector();
+    renderRaceBoard(); loadAndRenderStandings(); renderQuali(); renderSessionInfo(sess); renderSessionSelector();
     renderLapByLap(); renderWeather();
     S.lastUpdated=new Date(); resetStaleTimer();
 
@@ -847,156 +848,207 @@ function updateHeader(s){
 
 function renderRaceBoard(){
   const wrap=$('lb-race-wrap');
-  if(!S.positions.length){
-    wrap.innerHTML=`<div class="smsg"><div class="ico">🏁</div><h3>No position data</h3><p>Race hasn't started, or data isn't available yet.</p></div>`;
-    return;
-  }
-  const sname=S.session?.session_name||'Session', mname=S.session?.meeting_name||'';
-  const isSprint=!!(sname.toLowerCase().includes('sprint'));
-  const placeholder=wrap.querySelector('.smsg');
-  if(placeholder) placeholder.remove();
-
-  let banner=wrap.querySelector('[data-banner]');
-  if(!banner||banner.dataset.banner!=='result'){
-    const bh=`<div class="result-banner" data-banner="result"><b>🏁 ${sname.toUpperCase()}${isSprint?'<span class="sprint-badge">SPRINT</span>':''}</b><span>${mname}</span></div>`;
-    if(banner) banner.outerHTML=bh; else wrap.insertAdjacentHTML('afterbegin',bh);
-  }
-
-  let winnerCard=wrap.querySelector('[data-winner]');
-  {
-    const winner=S.positions.find(p=>p.position===1);
-    if(winner){
-      const wd=S.drivers[winner.driver_number]||{};
-      const wCol=wd.team_colour?'#'+wd.team_colour:'#f5a623';
-      const fl=S.fastestLap?.driver_number===winner.driver_number;
-      const flTxt=fl?`<div style="margin-top:4px;font-size:11px;color:var(--purple)">🟣 Fastest Lap: ${fmtLap(S.fastestLap.lap_duration)}</div>`:
-        (S.fastestLap?`<div style="margin-top:4px;font-size:11px;color:var(--muted)">Fastest: ${(S.drivers[S.fastestLap.driver_number]?.name_acronym||'#'+S.fastestLap.driver_number)} ${fmtLap(S.fastestLap.lap_duration)}</div>`:'');
-      const wHtml=`<div data-winner onclick="openShareCard()" style="cursor:pointer;margin:8px 12px;background:linear-gradient(135deg,rgba(245,166,35,.1),rgba(245,166,35,.03));border:1px solid rgba(245,166,35,.3);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:14px"><div style="font-size:32px">🏆</div><div style="flex:1;min-width:0"><div style="font-size:10px;color:var(--gold);font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px">Winner</div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:22px;text-transform:uppercase;color:${wCol}">${wd.full_name||'Driver #'+winner.driver_number}</div><div style="font-size:11px;color:var(--muted);margin-top:1px">${wd.team_name||'—'}</div>${flTxt}</div></div>`;
-      if(!winnerCard){ wrap.insertAdjacentHTML('afterbegin',wHtml); wrap.querySelector('[data-winner]')&&wrap.querySelector('[data-banner]')&&wrap.querySelector('[data-winner]').after(wrap.querySelector('[data-banner]')); }
-      else{ if(winnerCard.innerHTML!==wHtml) winnerCard.outerHTML=wHtml; }
-    }
-  }
-
-  let list=wrap.querySelector('.dlist');
-  if(!list){ list=document.createElement('div'); list.className='dlist'; wrap.appendChild(list); }
-  const existing={};
-  list.querySelectorAll('[data-dn]').forEach(c=>{ existing[c.dataset.dn]=c; });
-
-  const ordered=[];
-  S.positions.forEach(p=>{
-    const dr=S.drivers[p.driver_number]||{}, lap=S.laps[p.driver_number];
-    const st=S.stints[p.driver_number];
-    const pos=p.position, isFl=S.fastestLap?.driver_number===p.driver_number;
-    const cls=pos===1?'p1':pos===2?'p2':pos===3?'p3':isFl?'fl':'';
-    const col=dr.team_colour?'#'+dr.team_colour:'#555';
-    const inPit=st?.pit_in_time&&!st?.pit_out_time;
-    const dn=String(p.driver_number);
-
-    const gapHTML=pos===1
-      ?'<span class="gap ldr">⬤ LEADER</span>'
-      :pos>1?`<span class="gap" style="color:var(--muted);font-size:11px">P${pos}</span>`
-      :'<span class="gap" style="color:var(--muted)">—</span>';
-
-    const lapHTML=lap?.lap_duration?`<span class="llap${isFl?' fl':''}">⏱ ${fmtLap(lap.lap_duration)}${isFl?' 🟣':''}</span>`:'';
-    const extrasHTML=[tyreHTML(st?.compound),inPit?'<span class="pit-badge">PIT</span>':''].join('');
-    const fullCls=`dcard ${cls}`;
-
-    let card=existing[dn];
-    if(!card){
-      card=document.createElement('div');
-      card.className=fullCls; card.dataset.dn=dn;
-      card.style.cursor='pointer'; card.onclick=()=>openDriverDrilldown(+dn);
-      card.innerHTML=`<div class="posn" data-f="posn">${pos}</div><div class="tcbar" style="background:${col}"></div><div class="dinfo"><div class="dname">${dr.full_name||'Driver #'+p.driver_number}</div><div class="dteam" style="color:${col}">${dr.team_name||'—'}</div><div class="dextra" data-f="extras">${extrasHTML}</div><div data-f="spark">${sparklineHTML(p.driver_number)}</div></div><div class="dright" data-f="right">${gapHTML}${lapHTML}</div>`;
-    } else {
-      if(card.className!==fullCls) card.className=fullCls;
-      const pe=card.querySelector('[data-f="posn"]'); if(pe&&pe.textContent!==String(pos)) pe.textContent=pos;
-      const re=card.querySelector('[data-f="right"]'); const rn=gapHTML+lapHTML; if(re&&re.innerHTML!==rn) re.innerHTML=rn;
-      const ee=card.querySelector('[data-f="extras"]'); if(ee&&ee.innerHTML!==extrasHTML) ee.innerHTML=extrasHTML;
-      const se=card.querySelector('[data-f="spark"]'); if(se){ const sh=sparklineHTML(p.driver_number); if(se.innerHTML!==sh) se.innerHTML=sh; }
-    }
-    ordered.push(card); delete existing[dn];
-  });
-  Object.values(existing).forEach(c=>c.remove());
-  ordered.forEach((c,i)=>{ if(list.children[i]!==c) list.appendChild(c); });
-}
-
-function computeSeasonStandings(){
-  const yr=String(S.dataYear||CURRENT_YEAR);
+  const yr=S.dataYear||CURRENT_YEAR;
   const cache=racesCacheLoad();
-  const raceSessions=Object.values(cache).filter(c=>{
+
+  // Collect all race sessions for this year, newest first
+  const races=Object.values(cache).filter(c=>{
     if(!c.session) return false;
     const sy=String(c.session.year||(c.session.date_start||'').slice(0,4));
-    return sy===yr&&!!(c.session.session_name||'').match(/race|grand prix/i);
+    return sy===String(yr)&&!!(c.session.session_name||'').match(/race|grand prix/i);
+  }).sort((a,b)=>new Date(b.session.date_start)-new Date(a.session.date_start));
+
+  // Also include the currently loaded session if it's a race for this year
+  if(S.session&&!!(S.session.session_name||'').match(/race|grand prix/i)){
+    const sy=String(S.session.year||(S.session.date_start||'').slice(0,4));
+    if(sy===String(yr)&&!races.find(c=>c.session.session_key===S.sk)){
+      races.unshift({
+        session:S.session, positions:S.positions,
+        fastestLap:S.fastestLap, drivers:S.drivers,
+      });
+    }
+  }
+
+  if(!races.length){
+    wrap.innerHTML=`<div class="smsg"><div class="ico">🏎️</div><h3>No races cached yet</h3>`
+      +`<p>${yr} race results will appear here.<br>Tap the calendar to load races.</p></div>`;
+    return;
+  }
+
+  let html=`<div style="padding:8px 12px 4px;display:flex;justify-content:space-between;align-items:center">`
+    +`<div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">${yr} Season · ${races.length} race${races.length===1?'':'s'}</div>`
+    +`</div>`;
+  html+=`<div class="dlist">`;
+
+  races.forEach((c,idx)=>{
+    const sess=c.session;
+    const positions=c.positions||[];
+    const drivers=c.drivers||{};
+    const fl=c.fastestLap;
+    const winner=positions.find(p=>p.position===1);
+    const wd=winner?drivers[winner.driver_number]||{}:{};
+    const wCol=wd.team_colour?'#'+wd.team_colour:'var(--gold)';
+    const rnd=idx+1; // approximate — newest first so this is cosmetic
+    const ds=sess.date_start
+      ?new Date(sess.date_start).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'—';
+    const isCurrent=sess.session_key===S.sk;
+    const flDr=fl?drivers[fl.driver_number]:null;
+
+    html+=`<div class="dcard${isCurrent?' p1':''}" style="cursor:pointer" onclick="loadSessionByKey(${sess.session_key})" title="Load ${sess.meeting_name||sess.session_name}">`;
+    html+=`<div class="posn" style="font-size:13px;color:var(--muted)">${ds}</div>`;
+    html+=`<div class="tcbar" style="background:${wCol}"></div>`;
+    html+=`<div class="dinfo">`;
+    html+=`<div class="dname" style="font-size:14px">${sess.meeting_name||sess.circuit_short_name||'—'}</div>`;
+    if(winner){
+      html+=`<div class="dteam" style="color:${wCol};margin-top:2px">🏆 ${wd.full_name||'#'+winner.driver_number}</div>`;
+      html+=`<div style="font-size:10px;color:var(--muted);margin-top:1px">${wd.team_name||'—'}`;
+      if(flDr) html+=` · 🟣 FL: ${flDr.name_acronym||'#'+fl.driver_number} ${fmtLap(fl.lap_duration)}`;
+      html+=`</div>`;
+    } else {
+      html+=`<div class="dteam" style="color:var(--muted)">No result data</div>`;
+    }
+    html+=`</div>`;
+    // P2 / P3 on the right
+    const p2=positions.find(p=>p.position===2), p3=positions.find(p=>p.position===3);
+    const d2=p2?drivers[p2.driver_number]:null, d3=p3?drivers[p3.driver_number]:null;
+    html+=`<div class="dright" style="text-align:right;font-size:10px;color:var(--muted);line-height:1.7">`;
+    if(d2) html+=`<div>2. ${d2.name_acronym||'#'+p2.driver_number}</div>`;
+    if(d3) html+=`<div>3. ${d3.name_acronym||'#'+p3.driver_number}</div>`;
+    html+=`</div>`;
+    html+=`</div>`;
   });
+
+  html+=`</div>`;
+  html+=`<div class="fn">Tap a race to load full details</div>`;
+  wrap.innerHTML=html;
+}
+
+/* ── Championship standings:
+   - Drivers:  fetched directly from /championship_drivers (official API)
+   - Teams:    manually derived by summing driver points by team (per spec)
+   Both keyed to the latest race session_key in the cache.
+── */
+
+function computeTeamStandings(driverRows){
+  // Derive constructor standings by summing driver points by team_name
+  const tMap={};
+  driverRows.forEach(d=>{
+    const name=d.team_name||'—';
+    if(name==='—') return;
+    const col=d.team_colour?'#'+d.team_colour:'#555';
+    if(!tMap[name]) tMap[name]={pts:0,wins:0,col};
+    tMap[name].pts+=(+d.points||0);
+    if(d.position===1) tMap[name].wins++;
+  });
+  return Object.entries(tMap)
+    .map(([name,v])=>({name,...v}))
+    .sort((a,b)=>b.pts-a.pts||b.wins-a.wins);
+}
+
+async function loadAndRenderStandings(){
+  const yr=String(S.dataYear||CURRENT_YEAR);
+  const cache=racesCacheLoad();
+
+  // Find latest race session_key for this year
+  const raceSessions=Object.values(cache)
+    .filter(c=>{
+      if(!c.session) return false;
+      const sy=String(c.session.year||(c.session.date_start||'').slice(0,4));
+      return sy===yr&&!!(c.session.session_name||'').match(/race|grand prix/i);
+    })
+    .sort((a,b)=>new Date(b.session.date_start)-new Date(a.session.date_start));
+
+  // Also consider the currently loaded session
   if(S.session&&!!(S.session.session_name||'').match(/race|grand prix/i)){
     const sy=String(S.session.year||(S.session.date_start||'').slice(0,4));
     if(sy===yr&&!raceSessions.find(c=>c.session.session_key===S.sk))
-      raceSessions.push({session:S.session,positions:S.positions,fastestLap:S.fastestLap,drivers:S.drivers});
+      raceSessions.unshift({session:S.session});
   }
-  if(!raceSessions.length) return {drivers:[],teams:[],count:0};
-  const dPts={},tPts={};
-  raceSessions.forEach(c=>{
-    const fl=c.fastestLap?.driver_number;
-    const flPos=fl?(c.positions||[]).find(p=>p.driver_number===fl)?.position||99:99;
-    (c.positions||[]).forEach(p=>{
-      const dn=p.driver_number,pos=p.position;
-      if(!pos||pos<1) return;
-      const pts=(PTS[pos-1]||0)+(dn===fl&&flPos<=10?1:0);
-      const dr=(c.drivers||{})[dn]||{};
-      const team=dr.team_name||'—',col=dr.team_colour?'#'+dr.team_colour:'#555';
-      if(!dPts[dn]) dPts[dn]={pts:0,wins:0,dr};
-      dPts[dn].pts+=pts; dPts[dn].dr=dr;
-      if(pos===1) dPts[dn].wins++;
-      if(team&&team!=='—'){
-        if(!tPts[team]) tPts[team]={pts:0,wins:0,col};
-        tPts[team].pts+=pts; if(pos===1) tPts[team].wins++;
-      }
-    });
-  });
-  const drivers=Object.entries(dPts).map(([dn,v])=>({dn:+dn,...v})).sort((a,b)=>b.pts-a.pts||b.wins-a.wins);
-  const teams=Object.entries(tPts).map(([name,v])=>({name,...v})).sort((a,b)=>b.pts-a.pts||b.wins-a.wins);
-  return {drivers,teams,count:raceSessions.length};
+
+  if(!raceSessions.length){
+    $('lb-drv-wrap').innerHTML=`<div class="smsg"><div class="ico">👤</div><h3>No data yet</h3><p>Load a race from the calendar to see standings.</p></div>`;
+    $('lb-team-wrap').innerHTML=`<div class="smsg"><div class="ico">🏭</div><h3>No data yet</h3><p>Load a race from the calendar to see standings.</p></div>`;
+    return;
+  }
+
+  const latestSk=raceSessions[0].session.session_key;
+
+  // Use cached championship data if already fetched for this sk
+  if(S.champSk===latestSk&&S.champDrivers.length){
+    renderStandings();
+    return;
+  }
+
+  // Show loading state
+  $('lb-drv-wrap').innerHTML=`<div class="smsg"><div class="ico">👤</div><h3>Loading standings…</h3></div>`;
+  $('lb-team-wrap').innerHTML=`<div class="smsg"><div class="ico">🏭</div><h3>Loading standings…</h3></div>`;
+
+  try{
+    const rows=await apiFetch(`/championship_drivers?session_key=${latestSk}`).catch(()=>[]);
+    if(!rows.length) throw new Error('No championship data returned');
+    S.champDrivers=rows.sort((a,b)=>(+a.position||99)-(+b.position||99));
+    S.champTeams=computeTeamStandings(S.champDrivers);
+    S.champSk=latestSk;
+    renderStandings();
+  }catch(e){
+    console.warn('[standings]',e.message);
+    $('lb-drv-wrap').innerHTML=`<div class="smsg"><div class="ico">⚠️</div><h3>Standings unavailable</h3><p>${e.message}</p></div>`;
+    $('lb-team-wrap').innerHTML=`<div class="smsg"><div class="ico">⚠️</div><h3>Standings unavailable</h3></div>`;
+  }
 }
 
 function renderStandings(){
-  const {drivers,teams,count}=computeSeasonStandings();
   const yr=S.dataYear||CURRENT_YEAR;
-  const note=count?`${yr} Championship · ${count} race${count===1?'':'s'} cached`:`${yr} · No races cached — tap calendar to load`;
+  const drivers=S.champDrivers;
+  const teams=S.champTeams;
+  const sk=S.champSk;
+
+  // Drivers — from API
   if(drivers.length){
-    const maxD=drivers[0].pts||1;
+    const maxD=+drivers[0].points||1;
+    const note=`${yr} Championship · as of session ${sk}`;
     let dh=`<div class="standings-wrap"><table class="st-table"><thead><tr><th>Pos</th><th></th><th>Driver</th><th>Team</th><th class="r">Pts</th><th class="r">W</th></tr></thead><tbody>`;
-    drivers.forEach(({dn,pts,wins,dr},i)=>{
-      const pos=i+1,pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
-      const col=dr.team_colour?'#'+dr.team_colour:'#555';
-      dh+=`<tr><td class="st-pos ${pcls}">${pos}</td><td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td>`
-        +`<td><div class="st-name">${dr.full_name||'#'+dn}</div><div class="st-sub">${dr.name_acronym||''}</div>`
+    drivers.forEach(d=>{
+      const pos=+d.position||0;
+      const pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
+      const col=d.team_colour?'#'+d.team_colour:'#555';
+      const pts=+d.points||0;
+      const wins=+d.wins||0;
+      dh+=`<tr><td class="st-pos ${pcls}">${pos}</td>`
+        +`<td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td>`
+        +`<td><div class="st-name">${d.full_name||d.name_acronym||'#'+d.driver_number}</div>`
+        +`<div class="st-sub">${d.name_acronym||''}</div>`
         +`<div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxD*100)}%;background:${col}"></div></div></td>`
-        +`<td><div class="st-sub" style="color:${col}">${dr.team_name||'—'}</div></td>`
-        +`<td class="r st-pts">${pts}</td><td class="r" style="color:var(--muted);font-size:12px">${wins||0}</td></tr>`;
+        +`<td><div class="st-sub" style="color:${col}">${d.team_name||'—'}</div></td>`
+        +`<td class="r st-pts">${pts}</td>`
+        +`<td class="r" style="color:var(--muted);font-size:12px">${wins}</td></tr>`;
     });
     dh+=`</tbody></table><div class="st-note">${note}</div></div>`;
     $('lb-drv-wrap').innerHTML=dh;
   } else {
-    $('lb-drv-wrap').innerHTML=`<div class="smsg"><div class="ico">👤</div><h3>No data yet</h3>`
-      +`<p>Season standings build as races are cached.<br>Tap the calendar to load a race.</p></div>`;
+    $('lb-drv-wrap').innerHTML=`<div class="smsg"><div class="ico">👤</div><h3>No data yet</h3><p>Load a race from the calendar to see standings.</p></div>`;
   }
+
+  // Teams — manually computed from driver data
   if(teams.length){
     const maxT=teams[0].pts||1;
+    const note=`${yr} Constructors · computed from driver points`;
     let th=`<div class="standings-wrap"><table class="st-table"><thead><tr><th>Pos</th><th></th><th>Constructor</th><th class="r">Pts</th><th class="r">W</th></tr></thead><tbody>`;
     teams.forEach(({name,pts,wins,col},i)=>{
-      const pos=i+1,pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
-      th+=`<tr><td class="st-pos ${pcls}">${pos}</td><td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td>`
-        +`<td><div class="st-name">${name}</div><div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxT*100)}%;background:${col}"></div></div></td>`
-        +`<td class="r st-pts">${pts}</td><td class="r" style="color:var(--muted);font-size:12px">${wins||0}</td></tr>`;
+      const pos=i+1, pcls=pos===1?'p1':pos===2?'p2':pos===3?'p3':'';
+      th+=`<tr><td class="st-pos ${pcls}">${pos}</td>`
+        +`<td><div style="width:4px;height:24px;border-radius:2px;background:${col}"></div></td>`
+        +`<td><div class="st-name">${name}</div>`
+        +`<div class="st-bar"><div class="st-barfill" style="width:${Math.round(pts/maxT*100)}%;background:${col}"></div></div></td>`
+        +`<td class="r st-pts">${pts}</td>`
+        +`<td class="r" style="color:var(--muted);font-size:12px">${wins}</td></tr>`;
     });
     th+=`</tbody></table><div class="st-note">${note}</div></div>`;
     $('lb-team-wrap').innerHTML=th;
   } else {
-    $('lb-team-wrap').innerHTML=`<div class="smsg"><div class="ico">🏭</div><h3>No data yet</h3>`
-      +`<p>Season standings build as races are cached.</p></div>`;
+    $('lb-team-wrap').innerHTML=`<div class="smsg"><div class="ico">🏭</div><h3>No data yet</h3><p>Season standings build from driver data.</p></div>`;
   }
 }
-
 
 /* ═══ CIRCUIT TRACK LENGTHS ═══════════════
    Keys are exact circuit_short_name strings returned
@@ -1815,7 +1867,7 @@ function hydrateFromRaceCache(c){
   S.positions.forEach(p=>{ lp[p.driver_number]=p; });
   S.positions = Object.values(lp).sort((a,b)=>a.position-b.position);
   if(S.fastestLap) $('fltime').textContent = fmtLap(S.fastestLap.lap_duration);
-  setStatus(); updateHeader(S.session); updateLapBar();  renderRaceBoard(); renderStandings(); renderQuali();
+  setStatus(); updateHeader(S.session); updateLapBar();  renderRaceBoard(); loadAndRenderStandings(); renderQuali();
   renderSessionInfo(S.session); renderSessionSelector();
   renderLapByLap(); renderWeather();
   S.lastUpdated = new Date(c._ts || Date.now());
@@ -1928,49 +1980,41 @@ async function prefetchAllRaces(sessions){
   _prefetchRunning=true;
   const bar=$('prefetch-bar'), fill=$('prefetch-fill'), cnt=$('prefetch-count');
   try{
-    const src=sessions||S.allYearSessions;
-    if(!src.length){_prefetchRunning=false;return;}
+    const all=sessions||S.allYearSessions;
+    if(!all.length){ _prefetchRunning=false; return; }
     const now=Date.now();
-    const toFetch=src.filter(s=>{
+
+    // Sequential, newest-first, race/sprint only, skip already cached
+    const toFetch=all.filter(s=>{
       if(!s.date_start||new Date(s.date_start).getTime()>=now) return false;
       if(s.session_key===S.sk) return false;
-      if(!!(s.session_name||'').match(/race|grand prix|sprint/i)===false) return false;
+      if(!(s.session_name||'').match(/race|grand prix|sprint/i)) return false;
       return !racesCacheGet(s.session_key);
     }).sort((a,b)=>new Date(b.date_start)-new Date(a.date_start));
 
-    if(!toFetch.length){_prefetchRunning=false;return;}
-    console.log(`[prefetch] ${toFetch.length} sessions to cache`);
+    if(!toFetch.length){ _prefetchRunning=false; return; }
+    console.log(`[prefetch] ${toFetch.length} sessions to cache (sequential)`);
     if(bar) bar.classList.add('show');
 
     const total=toFetch.length;
     let done=0;
-    const updateProgress=()=>{
+
+    for(const sess of toFetch){
+      if(!_prefetchRunning) break;
+      try{
+        await fetchAndCacheSession(sess);
+        console.log(`[prefetch] ✓ ${sess.session_name} (${sess.session_key})`);
+      }catch(e){
+        if(e.rateLimit||e.locked){ console.warn('[prefetch] stopped —', e.message); break; }
+        console.warn(`[prefetch] failed ${sess.session_key}:`, e.message);
+      }
       done++;
       if(cnt) cnt.textContent=`${done}/${total}`;
       if(fill) fill.style.width=`${Math.round(done/total*100)}%`;
-      if(done>=total&&bar){ setTimeout(()=>bar.classList.remove('show'),1500); }
-    };
-
-    // Parallel with concurrency limit of 3
-    const CONCURRENCY=3;
-    let aborted=false;
-    const queue=[...toFetch];
-    async function worker(){
-      while(queue.length&&!aborted){
-        const sess=queue.shift();
-        try{
-          await fetchAndCacheSession(sess);
-          console.log(`[prefetch] ✓ ${sess.session_name} (${sess.session_key})`);
-        }catch(e){
-          if(e.rateLimit||e.locked){ aborted=true; console.warn('[prefetch] stopped:', e.message); }
-          else console.warn(`[prefetch] failed ${sess.session_key}:`,e.message);
-        }
-        updateProgress();
-        if(!aborted) await new Promise(r=>setTimeout(r,800)); // brief gap between batches
-      }
+      loadAndRenderStandings(); renderRaceBoard();
+      await new Promise(r=>setTimeout(r,1500));
     }
-    // Launch CONCURRENCY workers in parallel
-    await Promise.all(Array.from({length:CONCURRENCY},()=>worker()));
+    if(done>=total&&bar) setTimeout(()=>bar.classList.remove('show'),1500);
   }finally{
     _prefetchRunning=false;
     if(bar) bar.classList.remove('show');
