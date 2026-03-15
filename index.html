@@ -880,25 +880,41 @@ function renderStandings(){
   }
 }
 
-/* ═══ CIRCUIT LENGTHS (km) ════════════════ */
-const CIRCUIT_LENGTHS={
-  'albert_park':5.278,'bahrain':5.412,'jeddah':6.174,'shanghai':5.451,
-  'miami':5.412,'imola':4.909,'monaco':3.337,'montreal':4.361,
-  'barcelona':4.657,'spielberg':4.318,'silverstone':5.891,'hungaroring':4.381,
-  'spa':7.004,'zandvoort':4.259,'monza':5.793,'baku':6.003,
-  'singapore':4.94,'suzuka':5.807,'lusail':5.38,'austin':5.513,
-  'mexico_city':4.304,'interlagos':4.309,'las_vegas':6.12,'yas_marina':5.281,
-  'sakhir':5.412, // alt key for bahrain
+/* ═══ CIRCUIT DATA (keyed by OpenF1 circuit_key integer) ══ */
+const CIRCUIT_DATA={
+  1: {name:'Melbourne',     km:5.278},
+  2: {name:'Bahrain',       km:5.412},
+  3: {name:'Villeneuve',    km:4.361},
+  4: {name:'Silverstone',   km:5.891},
+  5: {name:'Hockenheim',    km:4.574},
+  6: {name:'Hungaroring',   km:4.381},
+  7: {name:'Spa',           km:7.004},
+  9: {name:'Monza',         km:5.793},
+  10:{name:'Indianapolis',  km:4.192},
+  11:{name:'Suzuka',        km:5.807},
+  12:{name:'Interlagos',    km:4.309},
+  13:{name:'Yas Marina',    km:5.281},
+  14:{name:'Shanghai',      km:5.451},
+  15:{name:'Bahrain Outer', km:3.543},
+  17:{name:'Austin',        km:5.513},
+  18:{name:'Baku',          km:6.003},
+  19:{name:'Zandvoort',     km:4.259},
+  21:{name:'Lusail',        km:5.380},
+  22:{name:'Las Vegas',     km:6.120},
+  24:{name:'Miami',         km:5.412},
+  55:{name:'Jeddah',        km:6.174},
+  61:{name:'Singapore',     km:4.940},
+  63:{name:'Imola',         km:4.909},
+  64:{name:'Barcelona',     km:4.657},
+  65:{name:'Monaco',        km:3.337},
+  66:{name:'Spielberg',     km:4.318},
+  67:{name:'Mexico City',   km:4.304},
 };
+
 function getTrackLength(s){
   if(!s||typeof s!=='object') return null;
-  const raw=s.circuit_key||s.circuit_short_name||s.location||'';
-  if(typeof raw!=='string') return null;
-  const key=raw.toLowerCase().replace(/\s+/g,'_');
-  if(CIRCUIT_LENGTHS[key]) return CIRCUIT_LENGTHS[key];
-  for(const [k,v] of Object.entries(CIRCUIT_LENGTHS)){
-    if(key.includes(k)||k.includes(key)) return v;
-  }
+  const ck=s.circuit_key;
+  if(ck!=null&&CIRCUIT_DATA[ck]) return CIRCUIT_DATA[ck].km;
   return null;
 }
 function countPitStops(){
