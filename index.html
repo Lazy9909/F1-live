@@ -159,7 +159,11 @@
     .slist{padding:10px 12px;display:flex;flex-direction:column;gap:7px;}
     .scard{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 13px;display:flex;justify-content:space-between;align-items:center;}
     .scard.now{border-color:var(--red);background:rgba(225,6,0,.06);}
-    .scard.past{opacity:.6;}
+    .scard.past{opacity:.65;}
+    .scard.clickable{cursor:pointer;transition:border-color .15s,background .15s,opacity .15s;}
+    .scard.clickable:hover,.scard.clickable:active{border-color:var(--red);background:rgba(225,6,0,.05);opacity:1;}
+    .scard.clickable .clickable-rnd{color:var(--red);}
+    .scard.clickable:active{transform:scale(.98);}
     .sname{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;text-transform:uppercase;}
     .sdate{font-size:11px;color:var(--muted);margin-top:2px;}
     .srnd{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:26px;color:var(--border);}
@@ -366,7 +370,6 @@
         <span style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap;">View:</span>
         <button id="lv-mode-lap" class="lbl-mode on" onclick="setLblMode('lap')">Lap Time</button>
         <button id="lv-mode-sec" class="lbl-mode" onclick="setLblMode('sector')">Sectors</button>
-        <button id="lv-mode-pos" class="lbl-mode" onclick="setLblMode('position')">Positions</button>
         <button id="lv-mode-str" class="lbl-mode" onclick="setLblMode('strategy')">Strategy</button>
         <button id="lv-mode-h2h" class="lbl-mode" onclick="setLblMode('h2h')">H2H</button>
         <button id="lv-mode-chart" class="lbl-mode" onclick="setLblMode('chart')">Chart</button>
@@ -406,7 +409,8 @@ const PTR_THRESH   = 68;
 const PTS          = [25,18,15,12,10,8,6,4,2,1];
 
 /* ═══ LOCAL STORAGE CACHE ═════════════════ */
-const LS_KEY = 'f1app_cache_v1';
+const LS_KEY        = 'f1app_cache_v1';
+const LS_SEASON_KEY = 'f1app_season_v1'; // year-level: meetings + all sessions
 function lsSave(patch){
   try{
     const cur = lsLoad();
@@ -415,6 +419,13 @@ function lsSave(patch){
 }
 function lsLoad(){
   try{ return JSON.parse(localStorage.getItem(LS_KEY)||'{}'); }catch(e){ return {}; }
+}
+
+function seasonSave(yr, meetings, sessions){
+  try{ localStorage.setItem(LS_SEASON_KEY, JSON.stringify({yr, meetings, sessions, _ts:Date.now()})); }catch(e){}
+}
+function seasonLoad(){
+  try{ return JSON.parse(localStorage.getItem(LS_SEASON_KEY)||'null'); }catch(e){ return null; }
 }
 
 /* ═══ API FETCH ═══════════════════════════ */
@@ -567,6 +578,8 @@ async function findSession(){
       if(!candidate) continue;
       S.dataYear=yr;
       S.allYearSessions=all;
+      // Persist full year session list to season cache
+      if(all.length) seasonSave(yr, null, all);
       if(candidate.meeting_key)
         S.meetingSessions=all.filter(s=>s.meeting_key===candidate.meeting_key)
           .sort((a,b)=>new Date(a.date_start)-new Date(b.date_start));
@@ -610,6 +623,11 @@ async function bootLoad(){
     S.fastestLap= cache.fastestLap || null;
     S.qualiResults    = cache.qualiResults    || [];
     S.allYearSessions = cache.allYearSessions || [];
+    // Also restore from season cache if allYearSessions is empty
+    if(!S.allYearSessions.length){
+      const sc=seasonLoad();
+      if(sc&&sc.sessions) S.allYearSessions=sc.sessions;
+    }
     S.lapCount  = cache.lapCount || 0;
     S.totalLaps = cache.totalLaps || 58;
     // Rebuild lp map from cached positions
@@ -759,6 +777,8 @@ async function loadAll(){
       qualiResults: S.qualiResults,
       allYearSessions: S.allYearSessions,
     });
+    // Keep season cache fresh with latest sessions list
+    if(S.allYearSessions.length) seasonSave(S.dataYear||CURRENT_YEAR, null, S.allYearSessions);
 
     if(!_schedDone){ _schedDone=true; loadSchedule(); }
     setTick(TICK_IDLE);
@@ -1078,10 +1098,9 @@ let _lblSelectedDrivers=new Set(), _lblMode='lap';
 
 function setLblMode(mode){
   _lblMode=mode;
-  const ml=$('lv-mode-lap'), ms=$('lv-mode-sec'), mp=$('lv-mode-pos'), mstr=$('lv-mode-str'), mh2h=$('lv-mode-h2h'), mch=$('lv-mode-chart');
+  const ml=$('lv-mode-lap'), ms=$('lv-mode-sec'), mstr=$('lv-mode-str'), mh2h=$('lv-mode-h2h'), mch=$('lv-mode-chart');
   if(ml) ml.classList.toggle('on', mode==='lap');
   if(ms) ms.classList.toggle('on', mode==='sector');
-  if(mp) mp.classList.toggle('on', mode==='position');
   if(mstr) mstr.classList.toggle('on', mode==='strategy');
   if(mh2h) mh2h.classList.toggle('on', mode==='h2h');
   if(mch)  mch.classList.toggle('on',  mode==='chart');
@@ -1158,8 +1177,6 @@ function renderLapByLap(){
 
   if(_lblMode==='sector'){
     renderSectorView(wrap, selected, driverLaps, sortedLaps, overallFastest);
-  } else if(_lblMode==='position'){
-    renderPositionView(wrap, selected, driverLaps, sortedLaps);
   } else if(_lblMode==='strategy'){
     renderStrategyView(wrap);
   } else if(_lblMode==='h2h'){
@@ -1296,105 +1313,6 @@ function renderSectorView(wrap, selected, driverLaps, sortedLaps, overallFastest
   wrap.innerHTML=html;
 }
 
-function renderPositionView(wrap, selected, driverLaps, sortedLaps){
-  // Build grid position map from S.startingGrid
-  const gridMap={};
-  S.startingGrid.forEach(g=>{ if(g.driver_number!=null) gridMap[+g.driver_number]=+g.position; });
-  const hasGrid=Object.keys(gridMap).length>0;
-
-  // Build a per-driver sorted position history: [{ts, position}]
-  // S.allPositions is the raw array from /position endpoint
-  const posHistory={}; // { driver_number: [{ts, pos}] sorted by ts }
-  S.allPositions.forEach(p=>{
-    const dn=+p.driver_number;
-    if(!posHistory[dn]) posHistory[dn]=[];
-    posHistory[dn].push({ts:new Date(p.date).getTime(), pos:+p.position});
-  });
-  // Sort each driver's history chronologically
-  Object.values(posHistory).forEach(arr=>arr.sort((a,b)=>a.ts-b.ts));
-
-  // Helper: get a driver's position at a given timestamp
-  // Returns the last known position at or before that time
-  function posAt(dn, ts){
-    const hist=posHistory[dn];
-    if(!hist||!hist.length) return null;
-    let result=null;
-    for(let i=0;i<hist.length;i++){
-      if(hist[i].ts<=ts) result=hist[i].pos;
-      else break;
-    }
-    return result;
-  }
-
-  // Build table — rows = laps, columns = selected drivers
-  // For each cell: position at end of that lap (use lap date_start + lap_duration as approx end time)
-  let html='<div class="lbl-wrap"><div class="lbl-table-wrap"><table class="lbl-table"><thead><tr>';
-  html+=`<th>Lap</th>`;
-  selected.forEach(dn=>{
-    const dr=S.drivers[dn]||{};
-    const col=dr.team_colour?'#'+dr.team_colour:'#555';
-    const grid=hasGrid&&gridMap[dn]?`<span style="font-size:9px;color:var(--muted)"> P${gridMap[dn]}</span>`:'';
-    html+=`<th style="color:${col}">${dr.name_acronym||'#'+dn}${grid}</th>`;
-  });
-  html+='</tr></thead><tbody>';
-
-  // Track previous lap's position per driver to show change arrows
-  const prevPos={};
-
-  sortedLaps.forEach(ln=>{
-    html+=`<tr><td>${ln}</td>`;
-    selected.forEach(dn=>{
-      const lap=driverLaps[dn]?.[ln];
-      // Get approximate end-of-lap timestamp
-      let lapEndTs=null;
-      if(lap?.date_start){
-        const lapStart=new Date(lap.date_start).getTime();
-        const dur=lap.lap_duration?+lap.lap_duration*1000:0;
-        lapEndTs=lapStart+(dur||60000); // fallback 1 min if no duration
-      }
-
-      const pos=lapEndTs?posAt(dn, lapEndTs):null;
-
-      if(pos==null){
-        html+='<td style="color:var(--muted)">—</td>';
-        return;
-      }
-
-      const prev=prevPos[dn]??null;
-      prevPos[dn]=pos;
-
-      // Delta vs previous lap
-      let deltaHtml='';
-      if(prev!==null&&prev!==pos){
-        const diff=prev-pos; // positive = gained positions (lower number = better)
-        const arrow=diff>0?'▲':'▼';
-        const col2=diff>0?'var(--green)':'var(--red)';
-        deltaHtml=`<span style="font-size:9px;color:${col2};margin-left:2px">${arrow}${Math.abs(diff)}</span>`;
-      }
-
-      // Net gain/loss vs grid start
-      let netHtml='';
-      if(hasGrid&&gridMap[dn]){
-        const net=gridMap[dn]-pos; // positive = gained vs grid
-        if(net>0) netHtml=`<span style="font-size:9px;color:var(--green)"> +${net}</span>`;
-        else if(net<0) netHtml=`<span style="font-size:9px;color:var(--red)"> ${net}</span>`;
-      }
-
-      // Position colour: P1=gold, P2=silver, P3=bronze, rest=text
-      const posCol=pos===1?'var(--gold)':pos===2?'var(--silver)':pos===3?'var(--bronze)':'var(--text)';
-      html+=`<td><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:${posCol}">${pos}</span>${deltaHtml}${netHtml}</td>`;
-    });
-    html+='</tr>';
-  });
-
-  html+='</tbody></table></div>';
-  html+=`<div class="lbl-note">`;
-  if(hasGrid) html+=`Grid start shown in header (P#) &nbsp;&nbsp; `;
-  html+=`<span style="color:var(--green)">▲</span> Gained &nbsp; <span style="color:var(--red)">▼</span> Lost vs prev lap &nbsp;&nbsp; Net vs grid start shown in <span style="color:var(--green)">green</span>/<span style="color:var(--red)">red</span>`;
-  html+=`</div></div>`;
-  wrap.innerHTML=html;
-}
-
 function renderWeather(){
   const wrap=$('sx-wx-wrap'),wx=S.weather;
   if(!wx){ wrap.innerHTML='<div class="smsg"><div class="ico">🌤️</div><h3>No weather data</h3><p>Weather available during active sessions</p></div>'; return; }
@@ -1406,10 +1324,76 @@ function renderWeather(){
 
 
 
+
+/* ── loadMeetingRace: find and load the Race session for a calendar meeting ── */
+async function loadMeetingRace(meetingKey, meetingName){
+  // Show loading state on the card
+  const card=document.querySelector(`[onclick*="${meetingKey}"]`);
+  if(card){ card.style.opacity='.5'; card.style.pointerEvents='none'; }
+
+  try{
+    // Get sessions for this meeting — from allYearSessions or fetch directly
+    let meetingSess = S.allYearSessions.filter(s=>s.meeting_key===meetingKey);
+    if(!meetingSess.length){
+      // Try season cache
+      const sc=seasonLoad();
+      if(sc&&sc.sessions) meetingSess=sc.sessions.filter(s=>s.meeting_key===meetingKey);
+    }
+    if(!meetingSess.length){
+      // Fetch from API
+      meetingSess = await apiFetch(`/sessions?meeting_key=${meetingKey}`).catch(()=>[]);
+      if(meetingSess.length&&S.allYearSessions.length){
+        // Merge into allYearSessions
+        const existingKeys=new Set(S.allYearSessions.map(s=>s.session_key));
+        meetingSess.forEach(s=>{ if(!existingKeys.has(s.session_key)) S.allYearSessions.push(s); });
+        seasonSave(S.dataYear||CURRENT_YEAR, null, S.allYearSessions);
+      }
+    }
+
+    if(!meetingSess.length){
+      alert(`No session data found for ${meetingName||'this race'}.`);
+      if(card){ card.style.opacity=''; card.style.pointerEvents=''; }
+      return;
+    }
+
+    // Prefer Race session, then Sprint, then latest by date
+    const now=Date.now();
+    const past=meetingSess.filter(s=>s.date_start&&new Date(s.date_start).getTime()<now);
+    past.sort((a,b)=>new Date(b.date_start)-new Date(a.date_start));
+    const race = past.find(s=>/race|grand prix/i.test(s.session_name||''))
+               || past.find(s=>/sprint/i.test(s.session_name||''))
+               || past[0];
+
+    if(!race){
+      alert(`No completed session found for ${meetingName||'this race'}.`);
+      if(card){ card.style.opacity=''; card.style.pointerEvents=''; }
+      return;
+    }
+
+    await loadSessionByKey(race.session_key);
+  }catch(e){
+    console.warn('[loadMeetingRace]', e);
+    alert('Could not load session: '+e.message);
+  }finally{
+    if(card){ card.style.opacity=''; card.style.pointerEvents=''; }
+  }
+}
+
 async function loadSchedule(){
   const yr = S.dataYear||CURRENT_YEAR;
   try{
-    const ms = await apiFetch(`/meetings?year=${yr}`);
+    // Try season cache first for instant render, then refresh from network
+    const sc=seasonLoad();
+    let ms = (sc&&sc.meetings&&sc.yr===yr) ? sc.meetings : null;
+    if(!ms){
+      ms = await apiFetch(`/meetings?year=${yr}`);
+      if(ms&&ms.length) seasonSave(yr, ms, S.allYearSessions.length?S.allYearSessions:sc?.sessions||[]);
+    } else {
+      // Background refresh
+      apiFetch(`/meetings?year=${yr}`).then(fresh=>{
+        if(fresh&&fresh.length){ seasonSave(yr, fresh, S.allYearSessions.length?S.allYearSessions:sc?.sessions||[]); }
+      }).catch(()=>{});
+    }
     if(!ms||!ms.length){ $('sc-wrap').innerHTML='<div class="smsg"><div class="ico">📅</div><h3>No calendar data</h3></div>'; return; }
     ms.sort((a,b)=>new Date(a.date_start)-new Date(b.date_start));
     const now=Date.now(); let html='<div class="slist">';
@@ -1417,7 +1401,13 @@ async function loadSchedule(){
       const start=m.date_start?new Date(m.date_start).getTime():0;
       const isCurr=S.session?.meeting_key===m.meeting_key, isPast=start&&start<now;
       const ds=m.date_start?new Date(m.date_start).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'—';
-      html+=`<div class="scard${isCurr?' now':isPast?' past':''}"><div><div class="sname">${m.meeting_name||m.country_name||'—'}</div><div class="sdate">${m.circuit_short_name||m.location||''} · ${ds}${isCurr?' <span style="color:var(--red);font-weight:700"> ← NOW</span>':''}${isPast&&!isCurr?' <span style="color:var(--green)">✓</span>':''}</div></div><div class="srnd">R${i+1}</div></div>`;
+      const clickable=isPast&&!isCurr;
+      html+=`<div class="scard${isCurr?' now':isPast?' past':''}${clickable?' clickable':''}" ${clickable?`onclick="loadMeetingRace(${m.meeting_key},'${(m.meeting_name||m.country_name||'').replace(/'/g,'')}')"`:''}>`
+        +`<div><div class="sname">${m.meeting_name||m.country_name||'—'}</div>`
+        +`<div class="sdate">${m.circuit_short_name||m.location||''} · ${ds}`
+        +`${isCurr?' <span style="color:var(--red);font-weight:700"> ← NOW</span>':''}`
+        +`${clickable?' <span style="color:var(--muted);font-size:10px">Tap to load ›</span>':''}`
+        +`</div></div><div class="srnd${clickable?' clickable-rnd':''}">R${i+1}</div></div>`;
     });
     html+='</div>'; $('sc-wrap').innerHTML=html;
     // Wire countdown to next upcoming race
@@ -2004,56 +1994,84 @@ function renderPositionChart(wrap, selected, driverLaps, sortedLaps){
     wrap.innerHTML='<div class="smsg"><div class="ico">📈</div><h3>Not enough position data</h3><p>Position history unavailable for selected drivers.</p></div>'; return;
   }
 
-  const PAD={t:24,r:16,b:36,l:32};
-  const W=Math.min(600, (window.innerWidth||360)-32);
-  const H=240;
+  // Chart dimensions — taller for readability, more bottom padding for X labels
+  const PAD={t:20,r:40,b:44,l:32};
+  const W=Math.min(620,(window.innerWidth||380)-24);
+  const H=260;
   const IW=W-PAD.l-PAD.r, IH=H-PAD.t-PAD.b;
   const maxLap=Math.max(...sortedLaps);
-  const minLap=Math.min(...sortedLaps);
+  const minLap=1; // always start from lap 1 for context
   const maxPos=20, minPos=1;
+  const lapRange=maxLap-minLap||1;
 
-  const xScale=ln=>((ln-minLap)/(maxLap-minLap||1))*IW;
+  const xScale=ln=>((ln-minLap)/lapRange)*IW;
   const yScale=pos=>((pos-minPos)/(maxPos-minPos))*IH;
+
+  // Label interval: every lap if short race, every 5 for medium, every 10 for long
+  const labelEvery=maxLap<=20?1:maxLap<=40?5:10;
 
   let svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;display:block;font-family:'Barlow Condensed',sans-serif">`;
 
   // Background
   svg+=`<rect width="${W}" height="${H}" fill="var(--bg,#0a0a0a)"/>`;
 
-  // Grid lines — every 5 positions
-  for(let p=1;p<=20;p+=5){
+  // ── Y-axis grid lines (horizontal) — every 5 positions ──
+  for(let p=5;p<=20;p+=5){
     const y=PAD.t+yScale(p);
-    svg+=`<line x1="${PAD.l}" y1="${y}" x2="${PAD.l+IW}" y2="${y}" stroke="rgba(255,255,255,.06)" stroke-width="1"/>`;
-    svg+=`<text x="${PAD.l-4}" y="${y+4}" text-anchor="end" font-size="9" fill="rgba(255,255,255,.3)">P${p}</text>`;
+    svg+=`<line x1="${PAD.l}" y1="${y.toFixed(1)}" x2="${PAD.l+IW}" y2="${y.toFixed(1)}" stroke="rgba(255,255,255,.06)" stroke-width="1"/>`;
+    svg+=`<text x="${PAD.l-5}" y="${(y+4).toFixed(1)}" text-anchor="end" font-size="9" fill="rgba(255,255,255,.28)">P${p}</text>`;
   }
-  // Grid lines — every 10 laps
-  for(let l=0;l<=maxLap;l+=10){
-    const x=PAD.l+xScale(l);
-    svg+=`<line x1="${x}" y1="${PAD.t}" x2="${x}" y2="${PAD.t+IH}" stroke="rgba(255,255,255,.06)" stroke-width="1"/>`;
-    svg+=`<text x="${x}" y="${H-4}" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.3)">${l}</text>`;
-  }
-  // Axis labels
-  svg+=`<text x="${PAD.l+IW/2}" y="${H-2}" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.4)">LAP</text>`;
+  // P1 label
+  svg+=`<text x="${PAD.l-5}" y="${(PAD.t+4).toFixed(1)}" text-anchor="end" font-size="9" fill="rgba(255,255,255,.28)">P1</text>`;
 
-  // P1 highlight band
+  // ── X-axis: vertical line per lap ──
+  // Every lap gets a line; labels shown at labelEvery interval + lap 1
+  for(let ln=minLap;ln<=maxLap;ln++){
+    const x=(PAD.l+xScale(ln)).toFixed(1);
+    const showLabel=(ln===1||ln%labelEvery===0||ln===maxLap);
+    // Line: slightly brighter on label laps
+    const lineOpacity=showLabel?'.10':'.04';
+    svg+=`<line x1="${x}" y1="${PAD.t}" x2="${x}" y2="${(PAD.t+IH).toFixed(1)}" stroke="rgba(255,255,255,${lineOpacity})" stroke-width="1"/>`;
+    // Tick mark at bottom of plot area
+    svg+=`<line x1="${x}" y1="${(PAD.t+IH).toFixed(1)}" x2="${x}" y2="${(PAD.t+IH+4).toFixed(1)}" stroke="rgba(255,255,255,.2)" stroke-width="1"/>`;
+    // Label below tick
+    if(showLabel){
+      svg+=`<text x="${x}" y="${(PAD.t+IH+14).toFixed(1)}" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.4)">${ln}</text>`;
+    }
+  }
+
+  // ── Axis border lines ──
+  // Left Y-axis
+  svg+=`<line x1="${PAD.l}" y1="${PAD.t}" x2="${PAD.l}" y2="${PAD.t+IH}" stroke="rgba(255,255,255,.15)" stroke-width="1"/>`;
+  // Bottom X-axis
+  svg+=`<line x1="${PAD.l}" y1="${PAD.t+IH}" x2="${PAD.l+IW}" y2="${PAD.t+IH}" stroke="rgba(255,255,255,.15)" stroke-width="1"/>`;
+
+  // ── X and Y axis titles ──
+  svg+=`<text x="${PAD.l+IW/2}" y="${H-4}" text-anchor="middle" font-size="9" font-weight="700" fill="rgba(255,255,255,.35)">LAP</text>`;
+  // Y-axis title (rotated)
+  svg+=`<text x="9" y="${PAD.t+IH/2}" text-anchor="middle" font-size="9" font-weight="700" fill="rgba(255,255,255,.35)" transform="rotate(-90,9,${PAD.t+IH/2})">POS</text>`;
+
+  // ── P1 highlight band ──
   const p1y=PAD.t+yScale(1);
-  svg+=`<rect x="${PAD.l}" y="${p1y-1}" width="${IW}" height="3" fill="rgba(245,166,35,.12)" rx="1"/>`;
+  svg+=`<rect x="${PAD.l}" y="${(p1y-1).toFixed(1)}" width="${IW}" height="3" fill="rgba(245,166,35,.1)" rx="1"/>`;
 
-  // Draw lines per driver
+  // ── Driver lines ──
   series.forEach(({dn,points})=>{
     const dr=S.drivers[dn]||{};
     const col=dr.team_colour?'#'+dr.team_colour:'#888';
     const d=points.map(({lap,pos},i)=>{
-      const x=PAD.l+xScale(lap), y=PAD.t+yScale(pos);
-      return `${i===0?'M':'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+      const x=(PAD.l+xScale(lap)).toFixed(1);
+      const y=(PAD.t+yScale(pos)).toFixed(1);
+      return `${i===0?'M':'L'}${x},${y}`;
     }).join(' ');
-    svg+=`<path d="${d}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" opacity="0.85"/>`;
-    // Label at end
+    svg+=`<path d="${d}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" opacity="0.9"/>`;
+    // End-of-line label + dot
     const last=points[points.length-1];
-    const lx=PAD.l+xScale(last.lap)+4, ly=PAD.t+yScale(last.pos)+4;
-    svg+=`<text x="${lx}" y="${ly}" font-size="9" font-weight="700" fill="${col}">${dr.name_acronym||'#'+dn}</text>`;
-    // Dot at final position
-    svg+=`<circle cx="${(PAD.l+xScale(last.lap)).toFixed(1)}" cy="${(PAD.t+yScale(last.pos)).toFixed(1)}" r="3" fill="${col}"/>`;
+    const ex=(PAD.l+xScale(last.lap)).toFixed(1);
+    const ey=(PAD.t+yScale(last.pos)).toFixed(1);
+    svg+=`<circle cx="${ex}" cy="${ey}" r="3" fill="${col}"/>`;
+    // Label to the right of the dot, nudged vertically if needed
+    svg+=`<text x="${(+ex+5).toFixed(1)}" y="${(+ey+4).toFixed(1)}" font-size="9" font-weight="700" fill="${col}">${dr.name_acronym||'#'+dn}</text>`;
   });
 
   svg+='</svg>';
@@ -2065,9 +2083,9 @@ function renderPositionChart(wrap, selected, driverLaps, sortedLaps){
     return `<div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text)"><div style="width:16px;height:3px;border-radius:2px;background:${col}"></div>${dr.name_acronym||'#'+dn}</div>`;
   }).join('');
 
-  wrap.innerHTML=`<div style="padding:12px 12px 4px">${svg}</div>`
+  wrap.innerHTML=`<div style="padding:12px 12px 4px;overflow-x:auto">${svg}</div>`
     +`<div style="display:flex;flex-wrap:wrap;gap:8px;padding:4px 12px 12px">${legend}</div>`
-    +'<div style="font-size:10px;color:var(--muted);padding:0 12px 16px">Position vs lap — lower is better · P1 band highlighted</div>';
+    +'<div style="font-size:10px;color:var(--muted);padding:0 12px 16px">Position vs lap — lower is better · P1 band in gold</div>';
 }
 
 /* ══════════════════════════════════════════════
