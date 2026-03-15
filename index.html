@@ -880,52 +880,51 @@ function renderStandings(){
   }
 }
 
-/* ═══ CIRCUIT DATA (keyed by OpenF1 circuit_key integer) ══ */
-const CIRCUIT_DATA={
-  1: {name:'Melbourne',     km:5.278},
-  2: {name:'Bahrain',       km:5.412},
-  3: {name:'Villeneuve',    km:4.361},
-  4: {name:'Silverstone',   km:5.891},
-  5: {name:'Hockenheim',    km:4.574},
-  6: {name:'Hungaroring',   km:4.381},
-  7: {name:'Spa',           km:7.004},
-  9: {name:'Monza',         km:5.793},
-  10:{name:'Indianapolis',  km:4.192},
-  11:{name:'Suzuka',        km:5.807},
-  12:{name:'Interlagos',    km:4.309},
-  13:{name:'Yas Marina',    km:5.281},
-  14:{name:'Shanghai',      km:5.451},
-  15:{name:'Bahrain Outer', km:3.543},
-  17:{name:'Austin',        km:5.513},
-  18:{name:'Baku',          km:6.003},
-  19:{name:'Zandvoort',     km:4.259},
-  21:{name:'Lusail',        km:5.380},
-  22:{name:'Las Vegas',     km:6.120},
-  24:{name:'Miami',         km:5.412},
-  55:{name:'Jeddah',        km:6.174},
-  61:{name:'Singapore',     km:4.940},
-  63:{name:'Imola',         km:4.909},
-  64:{name:'Barcelona',     km:4.657},
-  65:{name:'Monaco',        km:3.337},
-  66:{name:'Spielberg',     km:4.318},
-  67:{name:'Mexico City',   km:4.304},
+/* ═══ CIRCUIT TRACK LENGTHS ═══════════════
+   Keys are exact circuit_short_name strings returned
+   by the OpenF1 API (verified from sessions CSV).
+   Track lengths in km from FIA homologation data.
+   2023–2026 circuits covered.
+═══════════════════════════════════════════ */
+const CIRCUIT_KM={
+  'sakhir':         5.412, // Bahrain GP
+  'jeddah':         6.174, // Saudi Arabian GP
+  'melbourne':      5.278, // Australian GP
+  'baku':           6.003, // Azerbaijan GP
+  'miami':          5.412, // Miami GP
+  'imola':          4.909, // Emilia Romagna GP
+  'monte carlo':    3.337, // Monaco GP  ← API returns "Monte Carlo" not "Monaco"
+  'catalunya':      4.657, // Spanish GP (Barcelona)
+  'montreal':       4.361, // Canadian GP
+  'spielberg':      4.318, // Austrian GP
+  'silverstone':    5.891, // British GP
+  'hungaroring':    4.381, // Hungarian GP
+  'spa-francorchamps': 7.004, // Belgian GP
+  'zandvoort':      4.259, // Dutch GP
+  'monza':          5.793, // Italian GP
+  'singapore':      4.940, // Singapore GP
+  'suzuka':         5.807, // Japanese GP
+  'lusail':         5.380, // Qatar GP
+  'austin':         5.513, // US GP (COTA)
+  'mexico city':    4.304, // Mexico City GP
+  'interlagos':     4.309, // Brazilian GP
+  'las vegas':      6.120, // Las Vegas GP
+  'yas marina circuit': 5.281, // Abu Dhabi GP  ← API returns full name
+  'shanghai':       5.451, // Chinese GP (returned in 2024)
+  'madring':        5.474, // Spanish GP Madrid (2026 debut)
 };
 
 function getTrackLength(s){
   if(!s||typeof s!=='object') return null;
-  const ck=s.circuit_key;
-  if(ck!=null&&CIRCUIT_DATA[ck]) return CIRCUIT_DATA[ck].km;
-  return null;
+  const sn=s.circuit_short_name;
+  if(typeof sn!=='string') return null;
+  return CIRCUIT_KM[sn.toLowerCase().trim()]??null;
 }
 function countPitStops(){
-  // Sum up all stint pit_in events (stint_number > 1 means at least one pit happened)
-  // Each driver's current stint number tells us how many stops they've had (stints - 1)
   let total=0;
   Object.values(S.stints).forEach(st=>{ if(st.stint_number>1) total+=(st.stint_number-1); });
-  // Also count from allLaps: is_pit_out_lap true = pit occurred
   const pitLaps=new Set();
   (S.allLaps||[]).forEach(l=>{ if(l.is_pit_out_lap) pitLaps.add(`${l.driver_number}-${l.lap_number}`); });
-  // Use whichever is larger (stints are more reliable when available)
   return Math.max(total, pitLaps.size);
 }
 /* ═══ 2026 F1 CALENDAR (hardcoded) ════════ */
@@ -969,7 +968,6 @@ function getRoundInfo(s){
 }
 
 function renderSessionInfo(s){
-  if(!s||typeof s!=='object'){ console.error('[renderSessionInfo] invalid session:', s); return; }
   const live=isLiveSess(s);
   const ds=s.date_start?new Date(s.date_start).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'—';
   const nowMs=Date.now();
