@@ -438,6 +438,7 @@ async function apiFetch(path, retries=1){
       const r=await fetch(BASE+path,{signal:ctrl.signal,cache:'no-store'});
       clearTimeout(tid);
       if(r.status===401||r.status===403) throw Object.assign(new Error('OpenF1 session in progress — API locked until session ends'),{locked:true});
+      if(r.status===429) throw Object.assign(new Error(`Rate limited — too many requests (${path})`),{rateLimit:true});
       if(!r.ok) throw new Error(`HTTP ${r.status}: ${path}`);
       return await r.json();
     }catch(e){
@@ -662,7 +663,13 @@ async function bootLoad(){
   }catch(err){
     console.error('[boot]',err);
     hideBootProgress();
-    if(err.locked){
+    if(err.rateLimit){
+      $('lb-race-wrap').innerHTML=`<div class="smsg"><div class="ico">⏱</div><h3>Rate Limited</h3>`
+        +`<p style="font-size:12px;max-width:300px;margin:0 auto">OpenF1 is receiving too many requests.</p>`
+        +`<p style="margin-top:8px;font-size:11px;color:var(--muted)">Auto-retrying in 60 seconds.</p>`
+        +`<p style="margin-top:12px"><button onclick="manualRefresh()" style="background:var(--red);color:#fff;border:none;border-radius:6px;padding:8px 20px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:1px;cursor:pointer;text-transform:uppercase">↻ Retry</button></p></div>`;
+      $('dotlbl').textContent='LIMITED';
+    } else if(err.locked){
       // OpenF1 returns 401/403 while a session is live — show clear notice
       $('lb-race-wrap').innerHTML=`<div class="smsg"><div class="ico">🏁</div><h3>Session In Progress</h3>
           <p style="font-size:12px;max-width:300px;margin:0 auto">OpenF1 restricts API access while a session is running.</p>
@@ -680,7 +687,7 @@ async function bootLoad(){
       $('stale-bar').classList.add('show');
     }
     setStatus();
-    const retryMs = err.locked ? 300000 : 30000; // 5min if locked, 30s if network error
+    const retryMs = err.locked ? 300000 : err.rateLimit ? 60000 : 30000;
     setTimeout(()=>{ S.session=null; S.sessStale=true; _sessFetchedAt=0; bootLoad().then(startTimers); }, retryMs);
   }
 }
@@ -1379,6 +1386,28 @@ async function loadMeetingRace(meetingKey, meetingName){
   }
 }
 
+
+function renderMeetingsList(ms, notice){
+  ms.sort((a,b)=>new Date(a.date_start)-new Date(b.date_start));
+  const now=Date.now(); let html='<div class="slist">';
+  ms.forEach((m,i)=>{
+    const start=m.date_start?new Date(m.date_start).getTime():0;
+    const isCurr=S.session?.meeting_key===m.meeting_key, isPast=start&&start<now;
+    const ds=m.date_start?new Date(m.date_start).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'—';
+    const clickable=isPast&&!isCurr;
+    html+=`<div class="scard${isCurr?' now':isPast?' past':''}${clickable?' clickable':''}" ${clickable?`onclick="loadMeetingRace(${m.meeting_key},'${(m.meeting_name||m.country_name||'').replace(/'/g,'')}')"`:''}>
+      <div>
+        <div class="sname">${m.meeting_name||m.country_name||'—'}</div>
+        <div class="sdate">${m.circuit_short_name||m.location||''} · ${ds}${isCurr?' <span style="color:var(--red);font-weight:700"> ← NOW</span>':''}${clickable?' <span style="color:var(--muted);font-size:10px">Tap to load ›</span>':''}</div>
+      </div>
+      <div class="srnd${clickable?' clickable-rnd':''}">R${i+1}</div>
+    </div>`;
+  });
+  if(notice) html+=`<div style="font-size:10px;color:var(--orange);padding:6px 12px">${notice}</div>`;
+  html+='</div>';
+  $('sc-wrap').innerHTML=html;
+}
+
 async function loadSchedule(){
   const yr = S.dataYear||CURRENT_YEAR;
   try{
@@ -1395,21 +1424,7 @@ async function loadSchedule(){
       }).catch(()=>{});
     }
     if(!ms||!ms.length){ $('sc-wrap').innerHTML='<div class="smsg"><div class="ico">📅</div><h3>No calendar data</h3></div>'; return; }
-    ms.sort((a,b)=>new Date(a.date_start)-new Date(b.date_start));
-    const now=Date.now(); let html='<div class="slist">';
-    ms.forEach((m,i)=>{
-      const start=m.date_start?new Date(m.date_start).getTime():0;
-      const isCurr=S.session?.meeting_key===m.meeting_key, isPast=start&&start<now;
-      const ds=m.date_start?new Date(m.date_start).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'—';
-      const clickable=isPast&&!isCurr;
-      html+=`<div class="scard${isCurr?' now':isPast?' past':''}${clickable?' clickable':''}" ${clickable?`onclick="loadMeetingRace(${m.meeting_key},'${(m.meeting_name||m.country_name||'').replace(/'/g,'')}')"`:''}>`
-        +`<div><div class="sname">${m.meeting_name||m.country_name||'—'}</div>`
-        +`<div class="sdate">${m.circuit_short_name||m.location||''} · ${ds}`
-        +`${isCurr?' <span style="color:var(--red);font-weight:700"> ← NOW</span>':''}`
-        +`${clickable?' <span style="color:var(--muted);font-size:10px">Tap to load ›</span>':''}`
-        +`</div></div><div class="srnd${clickable?' clickable-rnd':''}">R${i+1}</div></div>`;
-    });
-    html+='</div>'; $('sc-wrap').innerHTML=html;
+    renderMeetingsList(ms);
     // Wire countdown to next upcoming race
     const upcoming=ms.filter(m=>m.date_start&&new Date(m.date_start).getTime()>Date.now());
     if(upcoming.length){
@@ -1417,7 +1432,16 @@ async function loadSchedule(){
       const next=upcoming[0];
       startCountdown(new Date(next.date_start).getTime(), next.meeting_name||next.country_name||'Next Race');
     }
-  }catch(e){ $('sc-wrap').innerHTML=`<div class="smsg"><div class="ico">⚠️</div><h3>Calendar error</h3><p>${e.message}</p></div>`; }
+  }catch(e){
+    if(e.rateLimit){
+      const sc=seasonLoad();
+      if(sc&&sc.meetings&&sc.meetings.length){
+        renderMeetingsList(sc.meetings,'⚠ Cached · rate limited');
+        return;
+      }
+    }
+    $('sc-wrap').innerHTML=`<div class="smsg"><div class="ico">⚠️</div><h3>Calendar error</h3><p>${e.message}</p></div>`;
+  }
 }
 
 
