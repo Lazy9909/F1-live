@@ -813,7 +813,9 @@ async function loadAll(){
         session:     sess,
         drivers:     S.drivers,
         positions:   S.positions,
+        allPositions:S.allPositions,
         laps:        S.laps,
+        allLaps:     S.allLaps,
         stints:      S.stints,
         fastestLap:  S.fastestLap,
         lapCount:    S.lapCount,
@@ -821,6 +823,8 @@ async function loadAll(){
         sessionResult: S.sessionResult,
         startingGrid:  S.startingGrid,
         qualiResults:  S.qualiResults,
+        sprintResult:  S.sprintResult,
+        weather:       S.weather,
       });
     }
 
@@ -1850,6 +1854,7 @@ function hydrateFromRaceCache(c){
   S.positions    = c.positions    || [];
   S.allPositions = c.positions    || [];
   S.laps         = c.laps         || {};
+  S.allLaps      = c.allLaps      || [];
   S.stints       = c.stints       || {};
   S.fastestLap   = c.fastestLap   || null;
   S.lapCount     = c.lapCount     || 0;
@@ -1857,6 +1862,8 @@ function hydrateFromRaceCache(c){
   S.sessionResult= c.sessionResult|| [];
   S.startingGrid = c.startingGrid || [];
   S.qualiResults = c.qualiResults || [];
+  S.sprintResult = c.sprintResult || [];
+  S.weather      = c.weather      || null;
   // Rebuild meetingSessions from allYearSessions
   if(S.session.meeting_key && S.allYearSessions.length){
     S.meetingSessions = S.allYearSessions
@@ -1867,9 +1874,15 @@ function hydrateFromRaceCache(c){
   S.positions.forEach(p=>{ lp[p.driver_number]=p; });
   S.positions = Object.values(lp).sort((a,b)=>a.position-b.position);
   if(S.fastestLap) $('fltime').textContent = fmtLap(S.fastestLap.lap_duration);
-  setStatus(); updateHeader(S.session); updateLapBar();  renderRaceBoard(); loadAndRenderStandings(); renderQuali();
-  renderSessionInfo(S.session); renderSessionSelector();
-  renderLapByLap(); renderWeather();
+  setStatus(); updateHeader(S.session); updateLapBar();
+  // Full render cycle
+  renderRaceBoard();
+  loadAndRenderStandings();
+  renderQuali();
+  renderSessionInfo(S.session);
+  renderSessionSelector();
+  renderLapByLap();
+  renderWeather();
   S.lastUpdated = new Date(c._ts || Date.now());
   // Update main LS cache too
   lsSave({
@@ -1897,11 +1910,12 @@ async function fetchAndCacheSession(sess){
   const sk=sess.session_key;
   if(racesCacheGet(sk)) return; // already cached
   const isRace=!!(sess.session_name||'').match(/race|grand prix/i);
-  const [drArr,posArr,lapArr,stArr,resArr,sgArr]=await Promise.all([
+  const [drArr,posArr,lapArr,stArr,wxArr,resArr,sgArr]=await Promise.all([
     apiFetch(`/drivers?session_key=${sk}`,0).catch(()=>[]),
     apiFetch(`/position?session_key=${sk}`,0).catch(()=>[]),
     apiFetch(`/laps?session_key=${sk}`,0).catch(()=>[]),
     apiFetch(`/stints?session_key=${sk}`,0).catch(()=>[]),
+    apiFetch(`/weather?session_key=${sk}`,0).catch(()=>[]),
     isRace?apiFetch(`/session_result?session_key=${sk}`,0).catch(()=>[]):Promise.resolve([]),
     isRace?apiFetch(`/starting_grid?session_key=${sk}`,0).catch(()=>[]):Promise.resolve([]),
   ]);
@@ -1915,10 +1929,12 @@ async function fetchAndCacheSession(sess){
   racesCacheSave(sk,{
     session:sess, drivers,
     positions:Object.values(lp).sort((a,b)=>a.position-b.position),
-    laps:ll, stints:ls, fastestLap, lapCount,
+    allPositions:posArr,
+    laps:ll, allLaps:lapArr, stints:ls, fastestLap, lapCount,
     totalLaps:(sess.total_laps&&+sess.total_laps>0?+sess.total_laps:0)||lapCount||58,
     sessionResult:resArr.sort((a,b)=>(a.position||99)-(b.position||99)),
     startingGrid:sgArr, qualiResults:[],
+    weather:wxArr.length?wxArr[wxArr.length-1]:null,
   });
 }
 
@@ -1993,28 +2009,42 @@ async function prefetchAllRaces(sessions){
     }).sort((a,b)=>new Date(b.date_start)-new Date(a.date_start));
 
     if(!toFetch.length){ _prefetchRunning=false; return; }
-    console.log(`[prefetch] ${toFetch.length} sessions to cache (sequential)`);
+    console.log(`[prefetch] ${toFetch.length} sessions to cache (sequential, rate-limited)`);
     if(bar) bar.classList.add('show');
 
     const total=toFetch.length;
     let done=0;
+    let consecutiveErrors=0;
+    const MAX_CONSECUTIVE_ERRORS=3;
 
     for(const sess of toFetch){
       if(!_prefetchRunning) break;
       try{
         await fetchAndCacheSession(sess);
         console.log(`[prefetch] ✓ ${sess.session_name} (${sess.session_key})`);
+        consecutiveErrors=0; // reset on success
       }catch(e){
-        if(e.rateLimit||e.locked){ console.warn('[prefetch] stopped —', e.message); break; }
+        consecutiveErrors++;
+        if(e.rateLimit||e.locked){ 
+          console.warn('[prefetch] stopped — rate limit/lock:', e.message);
+          break; 
+        }
+        if(consecutiveErrors>=MAX_CONSECUTIVE_ERRORS){
+          console.warn('[prefetch] stopped — too many consecutive errors');
+          break;
+        }
         console.warn(`[prefetch] failed ${sess.session_key}:`, e.message);
       }
       done++;
       if(cnt) cnt.textContent=`${done}/${total}`;
       if(fill) fill.style.width=`${Math.round(done/total*100)}%`;
       loadAndRenderStandings(); renderRaceBoard();
-      await new Promise(r=>setTimeout(r,1500));
+      // Adaptive delay: 1500ms base + exponential backoff on errors
+      const delayMs = 1500 + (consecutiveErrors * 500);
+      await new Promise(r=>setTimeout(r, delayMs));
     }
     if(done>=total&&bar) setTimeout(()=>bar.classList.remove('show'),1500);
+    console.log(`[prefetch] completed: ${done}/${total} sessions cached`);
   }finally{
     _prefetchRunning=false;
     if(bar) bar.classList.remove('show');
