@@ -1571,12 +1571,19 @@ function renderMeetingsList(ms, notice){
   if(notice) html+=`<div style="font-size:10px;color:var(--orange);padding:6px 12px">${notice}</div>`;
   html+='</div>';
   
-  // Add complete race results selector below calendar
-  html+='<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">';
-  html+=renderCachedRacesList();
-  html+='</div>';
+  // Add placeholder for race results (render deferred for speed)
+  html+='<div id="race-results-section"></div>';
   
   $('sc-wrap').innerHTML=html;
+  
+  // Render race results asynchronously after calendar is displayed
+  setTimeout(()=>{
+    const raceHtml=renderCachedRacesList();
+    const section=document.getElementById('race-results-section');
+    if(section){
+      section.innerHTML='<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">'+raceHtml+'</div>';
+    }
+  }, 100);
 }
 
 /* ─── Complete Race Results List (in Calendar) ─── */
@@ -2073,36 +2080,60 @@ function populateYearSelector(selectedYr){
 async function switchYear(yr){
   if(yr===S.dataYear&&S.allYearSessions.length) return;
   S.selectedYear=yr; S.dataYear=yr;
-  // Show loading in calendar tab
-  $('sc-wrap').innerHTML='<div class="smsg"><div class="ico">📅</div><h3>Loading '+yr+' calendar…</h3></div>';
-  // Try season cache for this year first
+  
+  // Try season cache for this year FIRST
   const sc=seasonLoad();
   let sessions = (sc&&sc.yr===yr&&sc.sessions) ? sc.sessions : null;
   let meetings = (sc&&sc.yr===yr&&sc.meetings) ? sc.meetings : null;
+  
+  // If cached, render immediately (instant load)
+  if(sessions&&meetings){
+    S.allYearSessions = sessions;
+    renderMeetingsList(meetings);
+    // Start prefetch silently in background
+    setTimeout(()=>prefetchAllRaces(S.allYearSessions),500);
+    return;
+  }
+  
+  // Not cached - show loading indicator
+  $('sc-wrap').innerHTML='<div class="smsg"><div class="ico">📅</div><h3>Loading '+yr+' calendar…</h3></div>';
+  
   try{
-    if(!sessions){
-      sessions = await apiFetch(`/sessions?year=${yr}`,0);
-      if(sessions&&sessions.length) seasonSave(yr, meetings, sessions);
-    }
-    if(!meetings){
-      meetings = await apiFetch(`/meetings?year=${yr}`,0).catch(()=>null);
-      if(meetings&&meetings.length) seasonSave(yr, meetings, sessions||[]);
+    // Fetch in parallel for speed
+    const [sess, meet] = await Promise.all([
+      sessions ? Promise.resolve(sessions) : apiFetch(`/sessions?year=${yr}`,0),
+      meetings ? Promise.resolve(meetings) : apiFetch(`/meetings?year=${yr}`,0).catch(()=>null)
+    ]);
+    
+    if(sess&&sess.length) sessions=sess;
+    if(meet&&meet.length) meetings=meet;
+    
+    // Save to cache
+    if(sessions||meetings){
+      seasonSave(yr, meetings||[], sessions||[]);
     }
   }catch(e){
     $('sc-wrap').innerHTML=`<div class="smsg"><div class="ico">⚠️</div><h3>Error</h3><p>${e.message}</p></div>`;
     return;
   }
+  
   S.allYearSessions = sessions||[];
+  
   // Render calendar with this year's meetings
-  if(meetings&&meetings.length) renderMeetingsList(meetings);
-  else $('sc-wrap').innerHTML='<div class="smsg"><div class="ico">📅</div><h3>No data for '+yr+'</h3></div>';
+  if(meetings&&meetings.length){
+    renderMeetingsList(meetings);
+  } else {
+    $('sc-wrap').innerHTML='<div class="smsg"><div class="ico">📅</div><h3>No data for '+yr+'</h3></div>';
+  }
+  
   // Switch calendar tab into view
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
   document.querySelectorAll('.pane').forEach(p=>p.classList.remove('on'));
   const t=document.querySelector('[data-t="sc"]'),p=$('p-sc');
   if(t) t.classList.add('on'); if(p) p.classList.add('on');
-  // Prefetch this year's races in background
-  setTimeout(()=>prefetchAllRaces(S.allYearSessions),1000);
+  
+  // Prefetch this year's races in background (no blocking)
+  setTimeout(()=>prefetchAllRaces(S.allYearSessions),500);
 }
 
 async function prefetchAllRaces(sessions){
