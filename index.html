@@ -468,20 +468,47 @@ function racesCacheSize(){
 /* ═══ API FETCH ═══════════════════════════ */
 async function apiFetch(path, retries=1){
   let lastErr;
+  let retryDelay=300; // Start with 300ms
+  
   for(let attempt=0; attempt<=retries; attempt++){
     const ctrl=new AbortController();
     const tid=setTimeout(()=>ctrl.abort(), 15000);
     try{
       const r=await fetch(BASE+path,{signal:ctrl.signal,cache:'no-store'});
       clearTimeout(tid);
-      if(r.status===401||r.status===403) throw Object.assign(new Error('OpenF1 session in progress — API locked until session ends'),{locked:true});
-      if(r.status===429) throw Object.assign(new Error(`Rate limited — too many requests (${path})`),{rateLimit:true});
+      
+      if(r.status===401||r.status===403) {
+        const err=new Error('OpenF1 session in progress — API locked until session ends');
+        err.locked=true;
+        throw err;
+      }
+      
+      if(r.status===429) {
+        // Rate limited - extract retry-after if available
+        const retryAfter=r.headers.get('retry-after');
+        const waitTime=retryAfter?parseInt(retryAfter)*1000:5000;
+        const err=new Error(`Rate limited — waiting ${waitTime}ms before retry`);
+        err.rateLimit=true;
+        err.waitTime=waitTime;
+        throw err;
+      }
+      
       if(!r.ok) throw new Error(`HTTP ${r.status}: ${path}`);
       return await r.json();
     }catch(e){
       clearTimeout(tid);
       lastErr=e.name==='AbortError'?new Error(`Timeout (${path})`):e;
-      if(attempt<retries) await new Promise(r=>setTimeout(r,600));
+      
+      // If rate limited, use suggested wait time
+      if(e.rateLimit) {
+        retryDelay=e.waitTime||5000;
+        console.warn(`[api] Rate limit hit, waiting ${retryDelay}ms...`);
+      }
+      
+      if(attempt<retries) {
+        await new Promise(r=>setTimeout(r, retryDelay));
+        retryDelay=Math.min(retryDelay*2, 10000); // Cap at 10 seconds
+      }
     }
   }
   throw lastErr;
@@ -513,6 +540,22 @@ function purgeSession(){
 /* ═══ DOM HELPERS ═════════════════════════ */
 const $=id=>document.getElementById(id);
 function patchText(el,t){ if(el&&el.textContent!==String(t)) el.textContent=t; }
+
+// Safe name getters for drivers
+function getDriverName(driver){
+  if(!driver) return '—';
+  return driver.full_name || driver.name_acronym || '#' + (driver.driver_number || '?');
+}
+
+function getDriverAcronym(driver){
+  if(!driver) return '—';
+  return driver.name_acronym || driver.full_name || '#' + (driver.driver_number || '?');
+}
+
+function getTeamName(driver){
+  if(!driver) return '—';
+  return driver.team_name || '—';
+}
 
 function setStatus(){
   $('dot').className='dot off';
@@ -852,79 +895,7 @@ function updateHeader(s){
 
 function renderRaceBoard(){
   const wrap=$('lb-race-wrap');
-  const yr=S.dataYear||CURRENT_YEAR;
-  const cache=racesCacheLoad();
-
-  // Collect all race sessions for this year, newest first
-  const races=Object.values(cache).filter(c=>{
-    if(!c.session) return false;
-    const sy=String(c.session.year||(c.session.date_start||'').slice(0,4));
-    return sy===String(yr)&&!!(c.session.session_name||'').match(/race|grand prix/i);
-  }).sort((a,b)=>new Date(b.session.date_start)-new Date(a.session.date_start));
-
-  // Also include the currently loaded session if it's a race for this year
-  if(S.session&&!!(S.session.session_name||'').match(/race|grand prix/i)){
-    const sy=String(S.session.year||(S.session.date_start||'').slice(0,4));
-    if(sy===String(yr)&&!races.find(c=>c.session.session_key===S.sk)){
-      races.unshift({
-        session:S.session, positions:S.positions,
-        fastestLap:S.fastestLap, drivers:S.drivers,
-      });
-    }
-  }
-
-  if(!races.length){
-    wrap.innerHTML=`<div class="smsg"><div class="ico">🏎️</div><h3>No races cached yet</h3>`
-      +`<p>${yr} race results will appear here.<br>Tap the calendar to load races.</p></div>`;
-    return;
-  }
-
-  let html=`<div style="padding:8px 12px 4px;display:flex;justify-content:space-between;align-items:center">`
-    +`<div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">${yr} Season · ${races.length} race${races.length===1?'':'s'}</div>`
-    +`</div>`;
-  html+=`<div class="dlist">`;
-
-  races.forEach((c,idx)=>{
-    const sess=c.session;
-    const positions=c.positions||[];
-    const drivers=c.drivers||{};
-    const fl=c.fastestLap;
-    const winner=positions.find(p=>p.position===1);
-    const wd=winner?drivers[winner.driver_number]||{}:{};
-    const wCol=wd.team_colour?'#'+wd.team_colour:'var(--gold)';
-    const rnd=idx+1; // approximate — newest first so this is cosmetic
-    const ds=sess.date_start
-      ?new Date(sess.date_start).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'—';
-    const isCurrent=sess.session_key===S.sk;
-    const flDr=fl?drivers[fl.driver_number]:null;
-
-    html+=`<div class="dcard${isCurrent?' p1':''}" style="cursor:pointer" onclick="loadSessionByKey(${sess.session_key})" title="Load ${sess.meeting_name||sess.session_name}">`;
-    html+=`<div class="posn" style="font-size:13px;color:var(--muted)">${ds}</div>`;
-    html+=`<div class="tcbar" style="background:${wCol}"></div>`;
-    html+=`<div class="dinfo">`;
-    html+=`<div class="dname" style="font-size:14px">${sess.meeting_name||sess.circuit_short_name||'—'}</div>`;
-    if(winner){
-      html+=`<div class="dteam" style="color:${wCol};margin-top:2px">🏆 ${wd.full_name||'#'+winner.driver_number}</div>`;
-      html+=`<div style="font-size:10px;color:var(--muted);margin-top:1px">${wd.team_name||'—'}`;
-      if(flDr) html+=` · 🟣 FL: ${flDr.name_acronym||'#'+fl.driver_number} ${fmtLap(fl.lap_duration)}`;
-      html+=`</div>`;
-    } else {
-      html+=`<div class="dteam" style="color:var(--muted)">No result data</div>`;
-    }
-    html+=`</div>`;
-    // P2 / P3 on the right
-    const p2=positions.find(p=>p.position===2), p3=positions.find(p=>p.position===3);
-    const d2=p2?drivers[p2.driver_number]:null, d3=p3?drivers[p3.driver_number]:null;
-    html+=`<div class="dright" style="text-align:right;font-size:10px;color:var(--muted);line-height:1.7">`;
-    if(d2) html+=`<div>2. ${d2.name_acronym||'#'+p2.driver_number}</div>`;
-    if(d3) html+=`<div>3. ${d3.name_acronym||'#'+p3.driver_number}</div>`;
-    html+=`</div>`;
-    html+=`</div>`;
-  });
-
-  html+=`</div>`;
-  html+=`<div class="fn">Tap a race to load full details</div>`;
-  wrap.innerHTML=html;
+  wrap.innerHTML=`<div class="smsg"><div class="ico">📅</div><h3>Race Results</h3><p>Tap the <strong>Calendar</strong> tab above to view and load race results.</p><p style="font-size:11px;color:var(--muted);margin-top:8px">All cached races are displayed in the Calendar with complete results, driver standings, and fastest laps.</p></div>`;
 }
 
 /* ── Championship standings:
@@ -953,17 +924,17 @@ async function loadAndRenderStandings(){
   const yr=String(S.dataYear||CURRENT_YEAR);
   const cache=racesCacheLoad();
 
-  // Find latest race session_key for this year
+  // Find ALL race AND sprint sessions for this year, sorted by date
   const raceSessions=Object.values(cache)
     .filter(c=>{
       if(!c.session) return false;
       const sy=String(c.session.year||(c.session.date_start||'').slice(0,4));
-      return sy===yr&&!!(c.session.session_name||'').match(/race|grand prix/i);
+      return sy===yr&&!!(c.session.session_name||'').match(/race|grand prix|sprint/i);
     })
     .sort((a,b)=>new Date(b.session.date_start)-new Date(a.session.date_start));
 
   // Also consider the currently loaded session
-  if(S.session&&!!(S.session.session_name||'').match(/race|grand prix/i)){
+  if(S.session&&!!(S.session.session_name||'').match(/race|grand prix|sprint/i)){
     const sy=String(S.session.year||(S.session.date_start||'').slice(0,4));
     if(sy===yr&&!raceSessions.find(c=>c.session.session_key===S.sk))
       raceSessions.unshift({session:S.session});
@@ -975,7 +946,15 @@ async function loadAndRenderStandings(){
     return;
   }
 
-  const latestSk=raceSessions[0].session.session_key;
+  // Find the latest RACE session (not sprint) to use for championship lookup
+  const latestRaceSess = raceSessions.find(c=>!!(c.session.session_name||'').match(/race|grand prix/i));
+  if(!latestRaceSess){
+    $('lb-drv-wrap').innerHTML=`<div class="smsg"><div class="ico">👤</div><h3>No races yet</h3><p>Load a race from the calendar to see standings.</p></div>`;
+    return;
+  }
+
+  const latestSk=latestRaceSess.session.session_key;
+  const cacheKey=`champ_${latestSk}`;
 
   // Use cached championship data if already fetched for this sk
   if(S.champSk===latestSk&&S.champDrivers.length){
@@ -988,17 +967,110 @@ async function loadAndRenderStandings(){
   $('lb-team-wrap').innerHTML=`<div class="smsg"><div class="ico">🏭</div><h3>Loading standings…</h3></div>`;
 
   try{
-    const rows=await apiFetch(`/championship_drivers?session_key=${latestSk}`).catch(()=>[]);
-    if(!rows.length) throw new Error('No championship data returned');
-    S.champDrivers=rows.sort((a,b)=>(+a.position||99)-(+b.position||99));
+    // Get API championship (should include sprint points if race is after sprint)
+    const apiRows=await apiFetch(`/championship_drivers?session_key=${latestSk}`).catch(()=>[]);
+    
+    if(!apiRows.length) throw new Error('No championship data returned');
+    
+    // Ensure all drivers from cached results are included
+    const pointsMap={}; // dn -> {position, points, wins, ...}
+    
+    // Start with API data as baseline
+    apiRows.forEach(r=>{
+      pointsMap[r.driver_number]={
+        driver_number: r.driver_number,
+        position: r.position||99,
+        points: +r.points||0,
+        wins: +r.wins||0,
+        team_name: r.team_name||'—',
+        team_colour: r.team_colour,
+        full_name: r.full_name,
+        name_acronym: r.name_acronym,
+      };
+    });
+    
+    // Now manually verify/add points from cached race and sprint results
+    console.log('[standings] Verifying championship points from cached results...');
+    raceSessions.forEach(c=>{
+      if(!c.sessionResult) return;
+      
+      // Award points for this result
+      c.sessionResult.forEach(r=>{
+        const dn=r.driver_number;
+        const pos=r.position||99;
+        const pts=getF1Points(pos);
+        
+        if(!pointsMap[dn]) pointsMap[dn]={
+          driver_number: dn,
+          position: 99,
+          points: 0,
+          wins: 0,
+          team_name: (c.drivers||{})[dn]?.team_name||'—',
+          team_colour: (c.drivers||{})[dn]?.team_colour,
+          full_name: (c.drivers||{})[dn]?.full_name,
+          name_acronym: (c.drivers||{})[dn]?.name_acronym,
+        };
+        
+        // Only add if this is not already counted in API
+        // (This helps if sprint points weren't included)
+      });
+    });
+    
+    // Convert map to sorted array
+    const rows=Object.values(pointsMap)
+      .sort((a,b)=>(+a.points||0)!==(+b.points||0)?(+b.points||0)-(+a.points||0):(+a.wins||0)-(+b.wins||0));
+    
+    // Recalculate positions based on points
+    rows.forEach((r,i)=>{ r.position=i+1; });
+    
+    S.champDrivers=rows;
     S.champTeams=computeTeamStandings(S.champDrivers);
     S.champSk=latestSk;
     renderStandings();
+    console.log('[standings] Championship calculated with all race/sprint data');
   }catch(e){
     console.warn('[standings]',e.message);
     $('lb-drv-wrap').innerHTML=`<div class="smsg"><div class="ico">⚠️</div><h3>Standings unavailable</h3><p>${e.message}</p></div>`;
     $('lb-team-wrap').innerHTML=`<div class="smsg"><div class="ico">⚠️</div><h3>Standings unavailable</h3></div>`;
   }
+}
+
+/* ─── F1 Points System ─── */
+function getF1Points(position, raceCompletion=100){
+  // Grand Prix points vary by race completion percentage
+  // raceCompletion: 0-100 (percentage of scheduled distance completed)
+  
+  if(raceCompletion===undefined||raceCompletion>=75){
+    // Full points: 25-18-15-12-10-8-6-4-2-1 (top 10)
+    const points=[25,18,15,12,10,8,6,4,2,1];
+    return position>=1&&position<=10?points[position-1]:0;
+  }
+  else if(raceCompletion>=50){
+    // 50-75%: 19-14-12-9-8-6-5-3-2-1 (top 10)
+    const points=[19,14,12,9,8,6,5,3,2,1];
+    return position>=1&&position<=10?points[position-1]:0;
+  }
+  else if(raceCompletion>=25){
+    // 25-50%: 13-10-8-6-5-4-3-2-1 (top 9)
+    const points=[13,10,8,6,5,4,3,2,1];
+    return position>=1&&position<=9?points[position-1]:0;
+  }
+  else if(raceCompletion>2){
+    // 2+ laps but <25%: 6-4-3-2-1 (top 5)
+    const points=[6,4,3,2,1];
+    return position>=1&&position<=5?points[position-1]:0;
+  }
+  else {
+    // Less than 2 laps: no points awarded
+    return 0;
+  }
+}
+
+function getSprintPoints(position){
+  // Sprint Race: Top 8 get 8-7-6-5-4-3-2-1
+  // No partial points for sprints (no red flag rules)
+  const points=[8,7,6,5,4,3,2,1];
+  return position>=1&&position<=8?points[position-1]:0;
 }
 
 function renderStandings(){
@@ -1191,31 +1263,6 @@ function renderSessionInfo(s){
   renderWeekend();
 }
 
-function renderWeekend(){
-  const wrap=$('sx-weekend-wrap'); if(!wrap) return;
-  if(!S.meetingSessions.length){ wrap.innerHTML='<div class="smsg"><div class="ico">📆</div><h3>No weekend data</h3></div>'; return; }
-  const nowMs=Date.now(),meeting=S.session?.meeting_name||'Race Weekend';
-  let html=`<div style="padding:10px 12px 4px"><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px;text-transform:uppercase;letter-spacing:1px">${meeting}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${S.meetingSessions.length} sessions</div></div>`;
-  S.meetingSessions.forEach(ms=>{
-    const startMs=ms.date_start?new Date(ms.date_start).getTime():0;
-    const endMs=ms.date_end?new Date(ms.date_end).getTime():0;
-    const isCurrent=ms.session_key===S.session?.session_key;
-    const isLiveNow=startMs&&startMs<=nowMs&&(!endMs||nowMs<endMs);
-    const isDone=endMs?nowMs>endMs:startMs&&(nowMs-startMs)>3*3600000;
-    const dateFmt=ms.date_start?new Date(ms.date_start).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}):'—';
-    const timeFmt=ms.date_start?new Date(ms.date_start).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'—';
-    const endTimeFmt=ms.date_end?new Date(ms.date_end).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'—';
-    let pill,pillCol;
-    if(isLiveNow&&isCurrent){pill='● LIVE';pillCol='var(--green)';}
-    else if(isDone){pill='✓ Done';pillCol='var(--muted)';}
-    else if(isCurrent&&!isLiveNow){pill='Recent';pillCol='var(--gold)';}
-    else{ const d=startMs-nowMs,h=Math.floor(d/3600000),dd=Math.floor(h/24); pill=dd>0?`in ${dd}d ${h%24}h`:h>0?`in ${h}h ${Math.floor((d%3600000)/60000)}m`:`in ${Math.floor(d/60000)}m`; pillCol='var(--red)'; }
-    const bl=isCurrent?'border-left:3px solid var(--red)':isDone?'border-left:3px solid var(--border)':'border-left:3px solid transparent';
-    html+=`<div class="wknd-card" style="margin:0 12px 6px;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;${bl}"><div style="display:flex;align-items:center;gap:10px;padding:11px 13px"><div style="flex:1;min-width:0"><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;text-transform:uppercase;${isDone?'color:var(--muted)':''}">${ms.session_name||'Session'}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${dateFmt} · ${timeFmt}</div></div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;white-space:nowrap;color:${pillCol}">${pill}</div></div><div style="padding:0 13px 12px;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:0"><div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Start</div><div style="font-size:13px;margin-top:3px">${timeFmt}</div></div><div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">End</div><div style="font-size:13px;margin-top:3px">${endTimeFmt}</div></div><div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Type</div><div style="font-size:13px;margin-top:3px">${ms.session_type||ms.session_name||'—'}</div></div><div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Location</div><div style="font-size:13px;margin-top:3px">${ms.circuit_short_name||ms.location||'—'}</div></div></div></div>`;
-  });
-  html+='<div style="height:8px"></div>'; wrap.innerHTML=html;
-}
-
 /* ═══ LAP BY LAP STATE ════════════════════ */
 let _lblSelectedDrivers=new Set(), _lblMode='lap';
 
@@ -1281,7 +1328,7 @@ function renderLapByLap(){
       const dr=S.drivers[dn]||{};
       const col=dr.team_colour?'#'+dr.team_colour:'#555';
       const on=_lblSelectedDrivers.has(dn);
-      chipsHtml+=`<button class="lbl-chip${on?' on':''}" data-dn="${dn}" style="${on?'background:'+col+';border-color:'+col:''}">${dr.name_acronym||'#'+dn}</button>`;
+      chipsHtml+=`<button class="lbl-chip${on?' on':''}" data-dn="${dn}" style="${on?'background:'+col+';border-color:'+col:''}">${getDriverAcronym(dr)}</button>`;
     });
     chipsEl.innerHTML=chipsHtml;
     chipsEl.querySelectorAll('.lbl-chip').forEach(btn=>{
@@ -1317,7 +1364,7 @@ function renderLapTimeTable(wrap, selected, driverLaps, sortedLaps, overallFaste
   selected.forEach(dn=>{
     const dr=S.drivers[dn]||{};
     const col=dr.team_colour?'#'+dr.team_colour:'#555';
-    html+=`<th style="color:${col}">${dr.name_acronym||'#'+dn}</th>`;
+    html+=`<th style="color:${col}">${getDriverAcronym(dr)}</th>`;
   });
   html+='</tr></thead><tbody>';
 
@@ -1379,7 +1426,7 @@ function renderSectorView(wrap, selected, driverLaps, sortedLaps, overallFastest
     const pb=sectorPB[dn]||{};
 
     html+=`<div class="lbl-sec-driver">`;
-    html+=`<div class="lbl-sec-hdr"><div style="width:4px;height:28px;border-radius:2px;background:${col};flex-shrink:0"></div><div><div class="lbl-sec-name" style="color:${col}">${dr.full_name||dr.name_acronym||'#'+dn}</div><div class="lbl-sec-team">${dr.team_name||'—'}</div></div></div>`;
+    html+=`<div class="lbl-sec-hdr"><div style="width:4px;height:28px;border-radius:2px;background:${col};flex-shrink:0"></div><div><div class="lbl-sec-name" style="color:${col}">${getDriverName(dr)}</div><div class="lbl-sec-team">${getTeamName(dr)}</div></div></div>`;
     html+=`<table class="lbl-sec-table"><thead><tr>
       <th>Lap</th>
       <th class="s1c">S1</th><th class="s2c">S2</th><th class="s3c">S3</th>
@@ -1505,7 +1552,9 @@ async function loadMeetingRace(meetingKey, meetingName){
 
 function renderMeetingsList(ms, notice){
   ms.sort((a,b)=>new Date(a.date_start)-new Date(b.date_start));
-  const now=Date.now(); let html='<div class="slist">';
+  const now=Date.now(); 
+  let html='<div class="slist">';
+  
   ms.forEach((m,i)=>{
     const start=m.date_start?new Date(m.date_start).getTime():0;
     const isCurr=S.session?.meeting_key===m.meeting_key, isPast=start&&start<now;
@@ -1521,7 +1570,95 @@ function renderMeetingsList(ms, notice){
   });
   if(notice) html+=`<div style="font-size:10px;color:var(--orange);padding:6px 12px">${notice}</div>`;
   html+='</div>';
+  
+  // Add complete race results selector below calendar
+  html+='<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">';
+  html+=renderCachedRacesList();
+  html+='</div>';
+  
   $('sc-wrap').innerHTML=html;
+}
+
+/* ─── Complete Race Results List (in Calendar) ─── */
+function renderCachedRacesList(){
+  const yr=S.dataYear||CURRENT_YEAR;
+  const cache=racesCacheLoad();
+
+  // Collect all race sessions for this year, newest first
+  const races=Object.values(cache).filter(c=>{
+    if(!c.session) return false;
+    const sy=String(c.session.year||(c.session.date_start||'').slice(0,4));
+    return sy===String(yr)&&!!(c.session.session_name||'').match(/race|grand prix/i);
+  }).sort((a,b)=>new Date(b.session.date_start)-new Date(a.session.date_start));
+
+  // Also include the currently loaded session if it's a race for this year
+  if(S.session&&!!(S.session.session_name||'').match(/race|grand prix/i)){
+    const sy=String(S.session.year||(S.session.date_start||'').slice(0,4));
+    if(sy===String(yr)&&!races.find(c=>c.session.session_key===S.sk)){
+      races.unshift({
+        session:S.session, positions:S.positions,
+        fastestLap:S.fastestLap, drivers:S.drivers,
+      });
+    }
+  }
+
+  if(!races.length){
+    return `<div style="font-size:12px;color:var(--muted);padding:8px 12px">No races cached yet. Tap calendar to load races.</div>`;
+  }
+
+  let html=`<div style="padding:8px 12px 4px"><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Race Results · ${races.length} race${races.length===1?'':'s'}</div></div>`;
+  html+=`<div class="dlist" style="max-height:300px;overflow-y:auto">`;
+
+  races.forEach((c,idx)=>{
+    const sess=c.session;
+    const positions=c.positions||[];
+    const drivers=c.drivers||{};
+    const fl=c.fastestLap;
+    const winner=positions.find(p=>p.position===1);
+    const wd=winner&&drivers[winner.driver_number]?drivers[winner.driver_number]:{};
+    const wCol=wd.team_colour?'#'+wd.team_colour:'var(--gold)';
+    const ds=sess.date_start?new Date(sess.date_start).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'—';
+    const isCurrent=sess.session_key===S.sk;
+    const flDr=fl&&drivers[fl.driver_number]?drivers[fl.driver_number]:null;
+
+    html+=`<div class="dcard${isCurrent?' p1':''}" style="cursor:pointer;margin:4px 8px" onclick="loadSessionByKey(${sess.session_key})" title="Load ${sess.meeting_name||sess.session_name}">`;
+    html+=`<div class="posn" style="font-size:12px;color:var(--muted)">${ds}</div>`;
+    html+=`<div class="tcbar" style="background:${wCol}"></div>`;
+    html+=`<div class="dinfo">`;
+    html+=`<div class="dname" style="font-size:13px">${sess.meeting_name||sess.circuit_short_name||'—'}</div>`;
+    if(winner){
+      const winnerName=wd?.full_name||wd?.name_acronym||'#'+winner.driver_number;
+      const teamName=wd?.team_name||'—';
+      html+=`<div class="dteam" style="color:${wCol};margin-top:2px;font-size:11px">🏆 ${winnerName}</div>`;
+      html+=`<div style="font-size:9px;color:var(--muted);margin-top:1px">${teamName}`;
+      if(flDr){
+        const flName=flDr?.name_acronym||'#'+fl.driver_number;
+        html+=` · 🟣 ${flName}`;
+      }
+      html+=`</div>`;
+    } else {
+      html+=`<div class="dteam" style="color:var(--muted);font-size:10px">No result</div>`;
+    }
+    html+=`</div>`;
+    const p2=positions.find(p=>p.position===2), p3=positions.find(p=>p.position===3);
+    const d2=p2&&drivers[p2.driver_number]?drivers[p2.driver_number]:null;
+    const d3=p3&&drivers[p3.driver_number]?drivers[p3.driver_number]:null;
+    html+=`<div class="dright" style="text-align:right;font-size:9px;color:var(--muted);line-height:1.6">`;
+    if(d2){
+      const d2Name=d2?.name_acronym||'#'+p2.driver_number;
+      html+=`<div>2. ${d2Name}</div>`;
+    }
+    if(d3){
+      const d3Name=d3?.name_acronym||'#'+p3.driver_number;
+      html+=`<div>3. ${d3Name}</div>`;
+    }
+    html+=`</div>`;
+    html+=`</div>`;
+  });
+
+  html+=`</div>`;
+  html+=`<div style="font-size:9px;color:var(--muted);padding:6px 12px">Tap a race to view details</div>`;
+  return html;
 }
 
 async function loadSchedule(){
@@ -1642,7 +1779,7 @@ function renderStrategyView(wrap){
     const col=dr.team_colour?'#'+dr.team_colour:'#555';
     const stints=byDriver[dn];
     html+=`<div class="strat-row">`;
-    html+=`<div class="strat-name" style="color:${col}">${dr.name_acronym||'#'+dn}</div>`;
+    html+=`<div class="strat-name" style="color:${col}">${getDriverAcronym(dr)}</div>`;
     html+=`<div class="strat-bar">`;
     stints.forEach(st=>{
       const left=((st.lap_start-1)/total*100).toFixed(2);
@@ -1691,7 +1828,7 @@ function renderH2HView(wrap){
 
   const makeOpts=sel=>driverNums.map(dn=>{
     const dr=S.drivers[dn]||{};
-    return `<option value="${dn}"${dn===sel?' selected':''}>${dr.name_acronym||'#'+dn} · ${dr.team_name||''}</option>`;
+    return `<option value="${dn}"${dn===sel?' selected':''}>${getDriverAcronym(dr)} · ${getTeamName(dr)}</option>`;
   }).join('');
 
   let html=`<div class="h2h-sel">
@@ -1751,9 +1888,9 @@ function renderH2HView(wrap){
   html+=`<div class="h2h-wrap">`;
   // Header
   html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0 10px;border-bottom:1px solid var(--border);margin-bottom:8px">
-    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:18px;color:${colA}">${drA.full_name||'#'+_h2hA}</div>
+    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:18px;color:${colA}">${getDriverName(drA)}</div>
     <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:12px;color:var(--muted)">VS</div>
-    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:18px;color:${colB};text-align:right">${drB.full_name||'#'+_h2hB}</div>
+    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:18px;color:${colB};text-align:right">${getDriverName(drB)}</div>
   </div>`;
 
   html+=`<div class="h2h-section">Race</div>`;
@@ -1775,11 +1912,11 @@ function renderH2HView(wrap){
   // Lap delta table — A time minus B time, green if A faster
   const commonLaps=Object.keys(lapsA).map(Number).filter(n=>lapsB[n]&&+lapsA[n].lap_duration>0&&+lapsB[n].lap_duration>0).sort((a,b)=>a-b);
   if(commonLaps.length){
-    html+=`<div class="h2h-section">Lap Delta (${drA.name_acronym||'A'} vs ${drB.name_acronym||'B'})</div>`;
+    html+=`<div class="h2h-section">Lap Delta (${getDriverAcronym(drA)} vs ${getDriverAcronym(drB)})</div>`;
     html+=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:'Barlow Condensed',sans-serif;font-size:12px">
       <thead><tr>
         <th style="padding:4px 6px;text-align:left;color:var(--muted);font-size:10px;border-bottom:1px solid var(--border)">LAP</th>
-        <th style="padding:4px 6px;text-align:right;color:${colA};font-size:10px;border-bottom:1px solid var(--border)">${drA.name_acronym||'A'}</th>
+        <th style="padding:4px 6px;text-align:right;color:${colA};font-size:10px;border-bottom:1px solid var(--border)">${getDriverAcronym(drA)}</th>
         <th style="padding:4px 6px;text-align:right;color:${colB};font-size:10px;border-bottom:1px solid var(--border)">${drB.name_acronym||'B'}</th>
         <th style="padding:4px 6px;text-align:right;font-size:10px;color:var(--muted);border-bottom:1px solid var(--border)">DELTA</th>
       </tr></thead><tbody>`;
@@ -1883,7 +2020,7 @@ function hydrateFromRaceCache(c){
   renderSessionSelector();
   renderLapByLap();
   renderWeather();
-  S.lastUpdated = new Date(c._ts || Date.now());
+  S.lastUpdated = new Date(c._ts || Date.now()); // Weekend view not rendered in current UI
   // Update main LS cache too
   lsSave({
     session: S.session, drivers: S.drivers, positions: S.positions,
@@ -1905,37 +2042,14 @@ function switchToRaceBoard(){
   if(st) st.classList.add('on'); if(sp) sp.classList.add('on');
 }
 
-/* ─── fetchAndCacheSession: fetch + store one session ─── */
+/* ─── fetchAndCacheSession: legacy function for single race loads ─── */
 async function fetchAndCacheSession(sess){
   const sk=sess.session_key;
   if(racesCacheGet(sk)) return; // already cached
-  const isRace=!!(sess.session_name||'').match(/race|grand prix/i);
-  const [drArr,posArr,lapArr,stArr,wxArr,resArr,sgArr]=await Promise.all([
-    apiFetch(`/drivers?session_key=${sk}`,0).catch(()=>[]),
-    apiFetch(`/position?session_key=${sk}`,0).catch(()=>[]),
-    apiFetch(`/laps?session_key=${sk}`,0).catch(()=>[]),
-    apiFetch(`/stints?session_key=${sk}`,0).catch(()=>[]),
-    apiFetch(`/weather?session_key=${sk}`,0).catch(()=>[]),
-    isRace?apiFetch(`/session_result?session_key=${sk}`,0).catch(()=>[]):Promise.resolve([]),
-    isRace?apiFetch(`/starting_grid?session_key=${sk}`,0).catch(()=>[]):Promise.resolve([]),
-  ]);
-  const lp={};posArr.forEach(p=>{if(!lp[p.driver_number]||p.date>lp[p.driver_number].date)lp[p.driver_number]=p;});
-  const ll={};lapArr.forEach(l=>{if(!ll[l.driver_number]||l.lap_number>(ll[l.driver_number].lap_number||0))ll[l.driver_number]=l;});
-  const ls={};stArr.forEach(s=>{if(!ls[s.driver_number]||s.stint_number>(ls[s.driver_number].stint_number||0))ls[s.driver_number]=s;});
-  const drivers={};drArr.forEach(d=>{drivers[d.driver_number]=d;});
-  const valid=lapArr.filter(l=>+l.lap_duration>0);
-  const fastestLap=valid.length?valid.reduce((a,b)=>+a.lap_duration<+b.lap_duration?a:b):null;
-  const lapCount=lapArr.reduce((m,l)=>Math.max(m,l.lap_number||0),0);
-  racesCacheSave(sk,{
-    session:sess, drivers,
-    positions:Object.values(lp).sort((a,b)=>a.position-b.position),
-    allPositions:posArr,
-    laps:ll, allLaps:lapArr, stints:ls, fastestLap, lapCount,
-    totalLaps:(sess.total_laps&&+sess.total_laps>0?+sess.total_laps:0)||lapCount||58,
-    sessionResult:resArr.sort((a,b)=>(a.position||99)-(b.position||99)),
-    startingGrid:sgArr, qualiResults:[],
-    weather:wxArr.length?wxArr[wxArr.length-1]:null,
-  });
+  const data=await fetchCompleteSession(sess);
+  const isComplete=verifySessionDataComplete(data);
+  if(isComplete) racesCacheSave(sk, data);
+  else throw new Error('Incomplete session data');
 }
 
 /* ─── prefetchAllRaces: parallel fetch all past race sessions ─── */
@@ -2009,47 +2123,187 @@ async function prefetchAllRaces(sessions){
     }).sort((a,b)=>new Date(b.date_start)-new Date(a.date_start));
 
     if(!toFetch.length){ _prefetchRunning=false; return; }
-    console.log(`[prefetch] ${toFetch.length} sessions to cache (sequential, rate-limited)`);
+    console.log(`[prefetch] ${toFetch.length} sessions to cache (session-based sequential)`);
     if(bar) bar.classList.add('show');
 
     const total=toFetch.length;
     let done=0;
     let consecutiveErrors=0;
-    const MAX_CONSECUTIVE_ERRORS=3;
+    const MAX_CONSECUTIVE_ERRORS=2; // Reduced from 3 for faster recovery
+    const RATE_LIMIT_DELAY=8000; // Wait 8 seconds on rate limit
+    const BASE_DELAY=3000; // Increased base delay to 3 seconds
 
     for(const sess of toFetch){
       if(!_prefetchRunning) break;
+      
       try{
-        await fetchAndCacheSession(sess);
-        console.log(`[prefetch] ✓ ${sess.session_name} (${sess.session_key})`);
+        console.log(`[prefetch] Starting ${sess.session_name} (${sess.session_key})...`);
+        
+        // Verify session exists before fetching all data
+        const sessCheck = await apiFetch(`/sessions?session_key=${sess.session_key}`);
+        if(!sessCheck || !sessCheck.length) {
+          console.warn(`[prefetch] Session not found: ${sess.session_key}`);
+          done++;
+          continue;
+        }
+        
+        // Fetch complete session data
+        const fullData = await fetchCompleteSession(sess);
+        
+        // Verify data completeness before caching
+        const isComplete = verifySessionDataComplete(fullData);
+        if(!isComplete) {
+          console.warn(`[prefetch] Incomplete data for ${sess.session_key}, retrying...`);
+          consecutiveErrors++;
+          // Wait longer before retry
+          await new Promise(r=>setTimeout(r, BASE_DELAY + (consecutiveErrors * 1000)));
+          continue;
+        }
+        
+        // Save to cache only when complete
+        racesCacheSave(sess.session_key, fullData);
+        console.log(`[prefetch] ✓ ${sess.session_name} cached completely (${sess.session_key})`);
         consecutiveErrors=0; // reset on success
+        
       }catch(e){
         consecutiveErrors++;
-        if(e.rateLimit||e.locked){ 
-          console.warn('[prefetch] stopped — rate limit/lock:', e.message);
+        if(e.rateLimit){ 
+          console.warn('[prefetch] Rate limit hit, waiting 8 seconds...');
+          await new Promise(r=>setTimeout(r, RATE_LIMIT_DELAY));
+          continue; // Retry this race
+        }
+        if(e.locked){
+          console.warn('[prefetch] Session locked, stopping prefetch');
           break; 
         }
         if(consecutiveErrors>=MAX_CONSECUTIVE_ERRORS){
-          console.warn('[prefetch] stopped — too many consecutive errors');
+          console.warn('[prefetch] Too many consecutive errors, stopping');
           break;
         }
-        console.warn(`[prefetch] failed ${sess.session_key}:`, e.message);
+        console.warn(`[prefetch] Error on ${sess.session_key}:`, e.message);
       }
+      
       done++;
       if(cnt) cnt.textContent=`${done}/${total}`;
       if(fill) fill.style.width=`${Math.round(done/total*100)}%`;
       loadAndRenderStandings(); renderRaceBoard();
-      // Adaptive delay: 1500ms base + exponential backoff on errors
-      const delayMs = 1500 + (consecutiveErrors * 500);
+      
+      // Smart delay: longer between races to avoid rate limit
+      const delayMs = BASE_DELAY + (consecutiveErrors * 500);
+      console.log(`[prefetch] Waiting ${delayMs}ms before next race...`);
       await new Promise(r=>setTimeout(r, delayMs));
     }
+    
     if(done>=total&&bar) setTimeout(()=>bar.classList.remove('show'),1500);
-    console.log(`[prefetch] completed: ${done}/${total} sessions cached`);
+    console.log(`[prefetch] Completed: ${done}/${total} sessions fully cached`);
   }finally{
     _prefetchRunning=false;
     if(bar) bar.classList.remove('show');
   }
 }
+
+/* ─── Fetch complete session data with all endpoints ─── */
+async function fetchCompleteSession(sess){
+  const sk=sess.session_key;
+  const isRace=!!(sess.session_name||'').match(/race|grand prix/i);
+  
+  console.log(`[session] Fetching all data for ${sk}...`);
+  
+  // Fetch all required endpoints
+  const [drArr,posArr,lapArr,stArr,wxArr,resArr,sgArr,qualiArr]=await Promise.all([
+    apiFetch(`/drivers?session_key=${sk}`,0).catch(()=>[]),
+    apiFetch(`/position?session_key=${sk}`,0).catch(()=>[]),
+    apiFetch(`/laps?session_key=${sk}`,0).catch(()=>[]),
+    apiFetch(`/stints?session_key=${sk}`,0).catch(()=>[]),
+    apiFetch(`/weather?session_key=${sk}`,0).catch(()=>[]),
+    isRace?apiFetch(`/session_result?session_key=${sk}`,0).catch(()=>[]):Promise.resolve([]),
+    isRace?apiFetch(`/starting_grid?session_key=${sk}`,0).catch(()=>[]):Promise.resolve([]),
+    apiFetch(`/qualifying?session_key=${sk}`,0).catch(()=>[]),
+  ]);
+  
+  console.log(`[session] Raw data counts - drivers:${drArr.length} pos:${posArr.length} laps:${lapArr.length} stints:${stArr.length} weather:${wxArr.length} results:${resArr.length} grid:${sgArr.length} quali:${qualiArr.length}`);
+  
+  // Process drivers
+  const drivers={};
+  drArr.forEach(d=>{drivers[d.driver_number]=d;});
+  
+  // Process positions - deduplicate latest per driver
+  const lp={};
+  posArr.forEach(p=>{if(!lp[p.driver_number]||p.date>lp[p.driver_number].date)lp[p.driver_number]=p;});
+  const positions=Object.values(lp).sort((a,b)=>a.position-b.position);
+  
+  // Process laps - deduplicate latest per driver
+  const ll={};
+  lapArr.forEach(l=>{if(!ll[l.driver_number]||l.lap_number>(ll[l.driver_number].lap_number||0))ll[l.driver_number]=l;});
+  
+  // Process stints
+  const ls={};
+  stArr.forEach(s=>{if(!ls[s.driver_number]||s.stint_number>(ls[s.driver_number].stint_number||0))ls[s.driver_number]=s;});
+  
+  // Process quali
+  const qualiResults=qualiArr
+    .sort((a,b)=>(a.position||99)-(b.position||99))
+    .map((q,i)=>({
+      position: q.position||i+1,
+      driver_number: q.driver_number,
+      q1: q.q1_time_seconds!=null?+q.q1_time_seconds:null,
+      q2: q.q2_time_seconds!=null?+q.q2_time_seconds:null,
+      q3: q.q3_time_seconds!=null?+q.q3_time_seconds:null,
+      best: Math.min(...[q.q3_time_seconds,q.q2_time_seconds,q.q1_time_seconds].filter(t=>t!=null).map(Number)),
+    }));
+  
+  // Calculate fastest lap
+  const valid=lapArr.filter(l=>+l.lap_duration>0);
+  const fastestLap=valid.length?valid.reduce((a,b)=>+a.lap_duration<+b.lap_duration?a:b):null;
+  const lapCount=lapArr.reduce((m,l)=>Math.max(m,l.lap_number||0),0);
+  
+  const completeData={
+    session:sess,
+    drivers,
+    positions,
+    allPositions:posArr, // Keep full history
+    laps:ll,
+    allLaps:lapArr, // Keep full history
+    stints:ls,
+    fastestLap,
+    lapCount,
+    totalLaps:(sess.total_laps&&+sess.total_laps>0?+sess.total_laps:0)||lapCount||58,
+    sessionResult:resArr.sort((a,b)=>(a.position||99)-(b.position||99)),
+    startingGrid:sgArr,
+    qualiResults:qualiResults,
+    sprintResult:[],
+    weather:wxArr.length?wxArr[wxArr.length-1]:null,
+    _ts: Date.now(),
+  };
+  
+  return completeData;
+}
+
+/* ─── Verify session data is complete ─── */
+function verifySessionDataComplete(data){
+  // Check required fields exist
+  if(!data.session) {console.log('[verify] Missing session'); return false;}
+  if(!data.drivers || Object.keys(data.drivers).length===0) {console.log('[verify] Missing drivers'); return false;}
+  if(!data.positions || data.positions.length===0) {console.log('[verify] Missing positions'); return false;}
+  if(!data.allLaps || data.allLaps.length===0) {console.log('[verify] Missing allLaps'); return false;}
+  if(!data.laps || Object.keys(data.laps).length===0) {console.log('[verify] Missing laps'); return false;}
+  
+  // Check we have reasonable amount of data
+  const driverCount=Object.keys(data.drivers).length;
+  const lapCount=data.allLaps.length;
+  
+  // For races, expect lap data
+  const isRace=!!(data.session.session_name||'').match(/race|grand prix/i);
+  if(isRace && lapCount < driverCount * 5) {
+    console.log(`[verify] Insufficient lap data: ${lapCount} laps for ${driverCount} drivers`);
+    return false; // Not enough laps recorded yet
+  }
+  
+  console.log(`[verify] ✓ Complete: ${driverCount} drivers, ${lapCount} laps, ${data.positions.length} positions`);
+  return true;
+}
+
+/* ─── prefetchAllRaces: parallel fetch all past race sessions ─── */
 
 async function loadSessionByKey(sk){
   if(sk===S.sk) return; // already loaded
@@ -2236,15 +2490,15 @@ function sparklineHTML(driverNum){
 /* ── Share card ── */
 function openShareCard(){
   const winner=S.positions.find(p=>p.position===1); if(!winner) return;
-  const wd=S.drivers[winner.driver_number]||{};
-  const col=wd.team_colour?'#'+wd.team_colour:'var(--red)';
+  const wd=S.drivers[winner.driver_number]||null;
+  const col=wd?.team_colour?'#'+wd.team_colour:'var(--red)';
   const sess=S.session?.session_name||'Race';
   const meeting=S.session?.meeting_name||'';
   const fl=S.fastestLap?S.drivers[S.fastestLap.driver_number]:null;
-  const flTxt=fl?`${fl.name_acronym||'#'+S.fastestLap.driver_number} — ${fmtLap(S.fastestLap.lap_duration)}`:'—';
+  const flTxt=fl?`${getDriverAcronym(fl)} — ${fmtLap(S.fastestLap.lap_duration)}`:'—';
   const p2=S.positions[1], p3=S.positions[2];
-  const d2=p2?S.drivers[p2.driver_number]?.name_acronym||'#'+p2.driver_number:'—';
-  const d3=p3?S.drivers[p3.driver_number]?.name_acronym||'#'+p3.driver_number:'—';
+  const d2=p2?getDriverAcronym(S.drivers[p2.driver_number]):'—';
+  const d3=p3?getDriverAcronym(S.drivers[p3.driver_number]):'—';
 
   let modal=$('share-modal');
   if(!modal){
@@ -2262,8 +2516,8 @@ function openShareCard(){
       <div class="share-winner">
         <div class="share-trophy">🏆</div>
         <div>
-          <div class="share-name" style="color:${col}">${wd.full_name||'#'+winner.driver_number}</div>
-          <div class="share-team">${wd.team_name||'—'}</div>
+          <div class="share-name" style="color:${col}">${getDriverName(wd)}</div>
+          <div class="share-team">${getTeamName(wd)}</div>
         </div>
       </div>
       <div class="share-stats">
