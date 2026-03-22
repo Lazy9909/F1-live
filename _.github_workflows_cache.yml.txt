@@ -1,0 +1,73 @@
+name: Update F1 Data Cache
+
+on:
+  # Run daily at 6 AM UTC (race day coverage)
+  schedule:
+    - cron: '0 6 * * *'
+  
+  # Allow manual trigger from Actions tab
+  workflow_dispatch:
+    inputs:
+      year:
+        description: 'F1 Season Year'
+        required: true
+        default: '2024'
+
+jobs:
+  update-cache:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Cache builder
+        run: |
+          YEAR=${{ github.event.inputs.year || 2024 }}
+          echo "📦 Building cache for F1 $YEAR..."
+          node cache-builder.js $YEAR
+      
+      - name: Verify cache
+        run: |
+          if [ -d "data-cache" ]; then
+            echo "✅ Cache directory created"
+            echo "Files generated:"
+            ls -lh data-cache/ | tail -20
+            echo ""
+            echo "Total cache size:"
+            du -sh data-cache/
+          else
+            echo "❌ Cache directory not found"
+            exit 1
+          fi
+      
+      - name: Commit changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          if git diff --quiet; then
+            echo "ℹ️  No changes to commit"
+          else
+            git add data-cache/
+            git commit -m "🏁 Update F1 data cache - $(date +%Y-%m-%d)"
+            git push
+            echo "✅ Cache updated and pushed"
+          fi
+      
+      - name: Create GitHub Issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '⚠️ Cache update failed',
+              body: `Cache builder workflow failed.\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`
+            })
